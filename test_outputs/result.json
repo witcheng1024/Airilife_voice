@@ -1,0 +1,98 @@
+[
+  {
+    "voice": "晓伊",
+    "emotion": "克隆",
+    "ok": true,
+    "audio_sec": 4.88,
+    "rtf": 1.437,
+    "file": "晓伊\\晓伊_克隆.wav"
+  },
+  {
+    "voice": "晓伊",
+    "emotion": "开心",
+    "ok": true,
+    "audio_sec": 4.88,
+    "rtf": 1.173,
+    "file": "晓伊\\晓伊_开心.wav"
+  },
+  {
+    "voice": "晓伊",
+    "emotion": "伤心",
+    "ok": true,
+    "audio_sec": 6.48,
+    "rtf": 1.024,
+    "file": "晓伊\\晓伊_伤心.wav"
+  },
+  {
+    "voice": "晓伊",
+    "emotion": "生气",
+    "ok": true,
+    "audio_sec": 3.52,
+    "rtf": 1.239,
+    "file": "晓伊\\晓伊_生气.wav"
+  },
+  {
+    "voice": "晓晓",
+    "emotion": "克隆",
+    "ok": true,
+    "audio_sec": 5.0,
+    "rtf": 1.102,
+    "file": "晓晓\\晓晓_克隆.wav"
+  },
+  {
+    "voice": "晓晓",
+    "emotion": "开心",
+    "ok": true,
+    "audio_sec": 5.48,
+    "rtf": 1.082,
+    "file": "晓晓\\晓晓_开心.wav"
+  },
+  {
+    "voice": "晓晓",
+    "emotion": "伤心",
+    "ok": true,
+    "audio_sec": 5.72,
+    "rtf": 1.142,
+    "file": "晓晓\\晓晓_伤心.wav"
+  },
+  {
+    "voice": "晓晓",
+    "emotion": "生气",
+    "ok": true,
+    "audio_sec": 3.48,
+    "rtf": 1.386,
+    "file": "晓晓\\晓晓_生气.wav"
+  },
+  {
+    "voice": "晓萱",
+    "emotion": "克隆",
+    "ok": true,
+    "audio_sec": 5.08,
+    "rtf": 1.095,
+    "file": "晓萱\\晓萱_克隆.wav"
+  },
+  {
+    "voice": "晓萱",
+    "emotion": "开心",
+    "ok": true,
+    "audio_sec": 4.92,
+    "rtf": 1.145,
+    "file": "晓萱\\晓萱_开心.wav"
+  },
+  {
+    "voice": "晓萱",
+    "emotion": "伤心",
+    "ok": true,
+    "audio_sec": 5.48,
+    "rtf": 1.128,
+    "file": "晓萱\\晓萱_伤心.wav"
+  },
+  {
+    "voice": "晓萱",
+    "emotion": "生气",
+    "ok": true,
+    "audio_sec": 3.4,
+    "rtf": 1.333,
+    "file": "晓萱\\晓萱_生气.wav"
+  }
+]

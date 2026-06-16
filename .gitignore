@@ -9,8 +9,12 @@ pretrained_models/
 # CosyVoice 官方源码（作为依赖单独 clone，不进 git）
 CosyVoice/
 
-# 生成的测试音频（可复现产物，不进 git）
-test_outputs/
+# 测试音频：放行 wav 样本与结果，排除日志
+test_outputs/**/*.log
+test_outputs/run.log
+
+# 参考音频的 mp3 中间产物（只保留 wav）
+reference_audio/*.mp3
 
 # 系统/编辑器
 .DS_Store
