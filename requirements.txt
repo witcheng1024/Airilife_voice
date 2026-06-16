@@ -1,0 +1,33 @@
+# CosyVoice3-0.5B 推理依赖（已在 Windows + RTX 4070 验证可用）
+# torch/torchaudio 单独装 CUDA 版：
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# ⚠️ 关键：transformers 必须钉死 4.51.3，5.x 会导致音频全静音
+transformers==4.51.3
+
+# 文本正则化（纯 Python，无需 pynini/WeTextProcessing）
+wetext
+
+# CosyVoice 核心推理依赖
+conformer
+diffusers
+hydra-core
+lightning
+x-transformers
+HyperPyYAML
+omegaconf
+inflect
+onnx
+onnxruntime
+openai-whisper
+modelscope
+librosa
+soundfile
+pyworld
+matplotlib
+gdown
+wget
+pyarrow
+
+# 参考音频生成（Edge TTS 晓伊音色）
+edge-tts

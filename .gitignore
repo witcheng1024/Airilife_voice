@@ -1,0 +1,19 @@
+# Python 虚拟环境（5.5G，不进 git）
+.venv/
+__pycache__/
+*.pyc
+
+# 模型权重（9.1G，用 modelscope 脚本下载，不进 git）
+pretrained_models/
+
+# CosyVoice 官方源码（作为依赖单独 clone，不进 git）
+CosyVoice/
+
+# 生成的测试音频（可复现产物，不进 git）
+test_outputs/
+
+# 系统/编辑器
+.DS_Store
+.idea/
+.vscode/
+*.log
