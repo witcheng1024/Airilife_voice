@@ -1,0 +1,44 @@
+{
+  "segments": [
+    {
+      "emotion": "happy",
+      "intensity": 0.7,
+      "text": "哥哥……你终于回来了呀",
+      "instruct": "尾音轻快上扬，带着期待",
+      "fine_text": "哥哥……你终于回来了呀",
+      "pause_after_ms": 200
+    },
+    {
+      "emotion": "sad",
+      "intensity": 0.5,
+      "text": "我还以为、还以为你今天又要丢下我一个人了呢……",
+      "instruct": "声音发颤，带哭腔，语速稍慢",
+      "fine_text": "我还以为、还以为你今天又要丢下我一个人了呢……",
+      "pause_after_ms": 300
+    },
+    {
+      "emotion": "happy",
+      "intensity": 0.8,
+      "text": "不过没关系啦！",
+      "instruct": "突然拔高音量，挤出甜腻的笑意",
+      "fine_text": "不过没关系啦！",
+      "pause_after_ms": 150
+    },
+    {
+      "emotion": "love",
+      "intensity": 0.9,
+      "text": "只要哥哥现在愿意摸摸我的头",
+      "instruct": "甜笑，撒娇，轻声",
+      "fine_text": "只要哥哥现在愿意摸摸我的头",
+      "pause_after_ms": 100
+    },
+    {
+      "emotion": "love",
+      "intensity": 1.0,
+      "text": "我就还是你最乖的妹妹哦~",
+      "instruct": "尾音上扬，调皮又依赖",
+      "fine_text": "我就还是你最乖的妹妹哦~",
+      "pause_after_ms": 0
+    }
+  ]
+}

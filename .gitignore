@@ -20,6 +20,9 @@ output/
 # 参考音频的 mp3 中间产物（只保留 wav）
 reference_audio/*.mp3
 
+# API 密钥
+.env
+
 # macOS 备份文件
 .gitignore.mac.bak*
 

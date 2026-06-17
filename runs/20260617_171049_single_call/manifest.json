@@ -1,0 +1,27 @@
+{
+  "model_load_s": 9.764,
+  "instruct": "请用先惊喜撒娇、再委屈带哭腔、然后强撑甜笑、最后调皮甜软的语气说这句话。",
+  "clean_text": "哥哥……你终于回来了呀，我还以为、还以为你今天又要丢下我一个人了呢……不过没关系啦！只要哥哥现在愿意摸摸我的头，我就还是你最乖的妹妹哦~",
+  "fine_text": "哥哥……你终于回来了呀，[breath]我还以为、还以为你今天又要丢下我一个人了呢……不过<strong>没关系啦</strong>！[laughter]只要哥哥现在愿意摸摸我的头，我就还是你最乖的妹妹哦~",
+  "plain": {
+    "file": "single_plain.wav",
+    "mode": "zero_shot",
+    "audio_s": 11.56,
+    "synth_s": 56.123,
+    "rtf": 4.855
+  },
+  "clean": {
+    "file": "single_clean.wav",
+    "mode": "instruct2",
+    "audio_s": 12.76,
+    "synth_s": 62.3,
+    "rtf": 4.882
+  },
+  "fine": {
+    "file": "single_fine.wav",
+    "mode": "instruct2",
+    "audio_s": 14.16,
+    "synth_s": 77.123,
+    "rtf": 5.447
+  }
+}

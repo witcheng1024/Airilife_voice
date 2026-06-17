@@ -1,0 +1,36 @@
+{
+  "segments": [
+    {
+      "emotion": "shy",
+      "intensity": 0.55,
+      "text": "哥哥……你终于回来了呀，",
+      "instruct": "请用轻快、带一点撒娇和尾音上扬的语气说这句话。",
+      "fine_text": "哥哥……你终于回来了呀，",
+      "pause_after_ms": 180
+    },
+    {
+      "emotion": "sad",
+      "intensity": 0.8,
+      "text": "我还以为、还以为你今天又要丢下我一个人了呢……",
+      "instruct": "请用委屈、声音发颤、接近哭腔但不要大哭的语气说这句话。",
+      "fine_text": "[breath]我还以为、还以为你今天又要丢下我一个人了呢……",
+      "pause_after_ms": 240
+    },
+    {
+      "emotion": "happy",
+      "intensity": 0.75,
+      "text": "不过没关系啦！",
+      "instruct": "请突然提高一点能量，用强撑出来的甜甜笑意说这句话。",
+      "fine_text": "不过<strong>没关系啦</strong>！",
+      "pause_after_ms": 120
+    },
+    {
+      "emotion": "playful",
+      "intensity": 0.65,
+      "text": "只要哥哥现在愿意摸摸我的头，我就还是你最乖的妹妹哦~",
+      "instruct": "请用调皮、甜软、亲近但不过度暧昧的妹妹语气说这句话。",
+      "fine_text": "只要哥哥现在愿意摸摸我的头，我就还是你最乖的妹妹哦~",
+      "pause_after_ms": 0
+    }
+  ]
+}
