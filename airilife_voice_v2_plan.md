@@ -28,6 +28,21 @@
 - CosyVoice3 按片段独立合成，最后做轻量拼接。
 - 暂时不做 ASR、AEC、barge-in、mini-Talker、训练数据生成。
 
+### 1.1 2026-06-18 本地延迟实测更新
+
+测试环境: Windows + RTX 4070 Laptop GPU，`deepseek-v4-flash`，CosyVoice3-0.5B，`fp16=True`。当前 `onnxruntime` 只有 `CPUExecutionProvider`，日志显示 `CUDAExecutionProvider` 不可用，因此 speech tokenizer 仍是主要优化点。
+
+关键结果:
+- DeepSeek SSE 协议测试: `jsonl` 首个完整 segment 约 2.62s；紧凑 `json_object` 约 1.75-3.27s；`[emotion]文本[emotion]文本` 能更早吐 token，但容易先 flush 出“哥哥！”这种过短片段。
+- 短首段 TTS: `哥哥！你终于来找我啦！` 非流式 4.90s；`stream=True` 首音频 4.22s、总耗时 4.82s。
+- clean 听感基线: `single_clean.wav` 对应的整句 clean text + 综合 instruct，本地复测 15.08s 音频合成 18.27s，RTF 1.21。
+- 端到端短输入: `我好无聊啊，陪我聊聊天吧`，DeepSeek JSON 2.42s，第一段 TTS 6.67s；如果模型已常驻预热，首段可播放约 9.1s。冷启动模型加载 20-50s，不可进入交互路径。
+
+结论:
+- V2/v0.2 作为“文本输入 -> 有情感 mei 语音输出”的 POC 可行。
+- 作为实时对话还不达标，当前瓶颈不是 DeepSeek，而是本地 CosyVoice3 推理和 CPU ONNX 路径。
+- 用户当前最满意的 `clean` 方案应作为音质基线；分段/流式是降低首听延迟的工程路径，不应牺牲 clean 听感作为默认目标。
+
 ---
 
 ## 2. 当前依据
@@ -161,6 +176,26 @@ DeepSeek 必须只输出 JSON，不输出解释文本。
   ]
 }
 ```
+
+### 4.1.1 运行时流式协议
+
+非流式脚本继续使用上面的 JSON object。低延迟运行时建议改用 **JSONL segment stream**，每行一个可播放片段:
+
+```jsonl
+{"e":"happy","i":0.8,"t":"哥哥！你终于来找我啦！","p":120}
+{"e":"playful","i":0.7,"t":"我都快无聊到数天花板了~","p":160}
+```
+
+选择 JSONL，而不是 `[happy]文本[playful]文本` 的原因:
+- JSONL 的首个完整 segment 边界清楚，解析器拿到 `\n` 或完整 `}` 即可启动 TTS。
+- inline tag 容易过早 flush 出“哥哥！”、“嗯嗯！”这类太短片段，TTS 首段开销不降反升，韵律也差。
+- JSON object 也可增量解析第一个 segment，但状态机更复杂；适合作为脚本保存格式，不适合作为最低延迟协议。
+
+运行时 flush 规则:
+- 优先在完整 JSONL 行结束时 flush。
+- 如果模型没输出换行，允许在 `}` 后立即 flush。
+- `t` 少于 6 个汉字时默认继续等下一个短语，除非是缓存短句或明确停顿。
+- 单个首段建议 8-18 个汉字；过短增加 TTS 固定开销，过长推迟首音频。
 
 ### 4.2 字段定义
 
@@ -362,31 +397,41 @@ DeepSeek 需要同时扮演“角色”和“语音导演”。
 目标: 为运行时体验做准备，但仍不做 ASR。
 
 任务:
-- DeepSeek 改为 SSE。
-- Parser 在拿到第一个完整 segment 后即可启动 TTS。
-- TTS 尝试 `stream=True`。
-- 播放器边收 chunk 边播放。
-- 队列最多保留 2-3 个 segments。
+- DeepSeek 改为 SSE + JSONL segment stream。
+- Parser 在拿到第一行完整 JSONL 后立即启动 TTS，同时继续接收后续 segment。
+- TTS 默认仍按 segment 合成；`stream=True` 只在实测首包收益稳定时开启。
+- 播放器边收 segment 音频边播放，队列最多保留 2-3 个 segments。
+- 模型进程必须常驻预热，冷启动只允许发生在服务启动阶段。
 
 验收:
 - 首段开始合成时间早于 DeepSeek 完整输出结束时间。
 - 首个可播放音频延迟有日志。
 - 即使后续 segment 还在生成，也能先播放第一段。
+- 记录 `llm_first_token_ms`、`first_segment_ms`、`tts_first_audio_ms`、`first_playable_ms`。
 
 ### Phase 5: Runtime Optimization
 
 目标: 降低延迟，提高稳定性。
 
 任务:
-- Windows/RTX 4070 环境安装 `onnxruntime-gpu`。
-- 确认 speech tokenizer 是否走 GPU。
-- 模型启动预热。
+- Windows/RTX 4070 环境安装并验证 `onnxruntime-gpu`，确认 `CUDAExecutionProvider` 生效。
+- 模型启动预热，并保持一个常驻 TTS worker，避免每轮 20-50s 加载。
 - 固定参考音频和 prompt text，减少运行时变量。
 - 缓存常用短句，例如“哥哥”“嗯嗯”“嘿嘿”等。
+- 对首段使用 8-18 字短 segment，避免 `哥哥！` 这种过短片段触发一次完整 TTS。
+- 评估 `load_trt` / TensorRT 只针对 flow decoder；CosyVoice3 代码对 DiT TensorRT fp16 有性能警告，必须实测后再启用。
+- 评估 `load_vllm` 作为二线优化；它可能降低 TTS 内部 LLM 延迟，但会增加依赖和显存压力。
 
 验收:
 - RTX 4070 上 RTF 明显低于当前 PyTorch + CPU onnxruntime 路径。
-- 复杂 4 段示例可以在可接受时间内完成。
+- 目标首段可播放 < 4s；理想目标 < 2.5s。
+- 复杂 4 段示例可以在可接受时间内完成，并保持 `single_clean.wav` 的音色/情感方向。
+
+### Phase 5.1 不优先做的优化
+
+- GGUF: 不适合当前 CosyVoice3。模型不是单一 LLM 权重，包含 PyTorch/ONNX/TTS flow/vocoder，转 GGUF 不能覆盖完整推理链路。
+- 整体 INT8/INT4 量化: 有音质和情感退化风险，且当前瓶颈先指向 CPU ONNX provider。先做 ONNX GPU / TRT / 常驻预热，再评估局部量化。
+- token-level DeepSeek -> TTS: 不做。中文 TTS 需要短语级上下文，token 级会破坏韵律，也会导致大量过短 TTS 调用。
 
 ---
 
@@ -413,6 +458,15 @@ Airilife_voice/
 ```
 
 短期可以先写单文件 `voice_v2.py`，跑通后再拆模块。
+
+### 8.1 脚本命名规范
+
+当前脚本处于 POC 阶段，暂不重命名历史文件，避免测试记录和 README 失效。后续新增/整理时按以下规则:
+- 主链路: `voice_v2.py`，后续拆到 `voice_v2/` 包。
+- 基准测试: `benchmark_latency.py`，只放可重复测量的 DeepSeek/TTS 延迟逻辑。
+- 一次性听感实验: `single_call_emotion_test.py`、`pitch_test_win.py` 这类保留 `_test` 后缀。
+- 平台差异脚本才使用 `_win` / `_mac`，例如 `make_refs_win.py`、`make_refs_mac.py`。
+- 避免新增 `run_test.py`、`test2.py`、`demo_new.py` 这类不可读名称。
 
 ---
 
