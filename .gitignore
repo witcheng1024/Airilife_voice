@@ -13,8 +13,15 @@ CosyVoice/
 test_outputs/**/*.log
 test_outputs/run.log
 
+# macOS 测试输出（wav 太大不进 git）
+test_outputs_mac/
+output/
+
 # 参考音频的 mp3 中间产物（只保留 wav）
 reference_audio/*.mp3
+
+# macOS 备份文件
+.gitignore.mac.bak*
 
 # 系统/编辑器
 .DS_Store
