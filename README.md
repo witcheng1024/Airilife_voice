@@ -108,9 +108,10 @@ D:/miniforge3/envs/gsv/python.exe tools/tts_server.py --compare
 
 ```
 POST /api/tts
-  {"text": "今天天气真好呢，我们去散步吧", "emotion": "温柔", "speaker": "firefly"}
+  {"text": "今天天气真好呢，我们去散步吧", "emotion": "温柔", "speaker": "firefly",
+   "stream_mode": "token"}   # token=首字最低(~120ms) | sentence=句子级更稳(demo 用)
   → 200, Content-Type: audio/L16; rate=32000; channels=1
-    响应体 = 原始 int16 PCM 逐块流（token 级），首块到达即"首字延迟"
+    响应体 = 原始 int16 PCM 逐块流，首块到达即"首字延迟"
 GET /health      → 引擎/模型/GPU/情绪列表
 GET /demo        → 浏览器流式试听页（Web Audio 实时播放，验证流式用耳朵）
 ```

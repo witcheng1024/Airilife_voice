@@ -110,13 +110,21 @@ _STREAM_KW = dict(
 )
 
 
-async def _stream(text: str, ref: str, ref_txt: str):
-    """逐块推流原始 int16 PCM（token 级流式）。infer_stream_async 内部已用 _infer_lock 串行化。"""
+async def _stream(text: str, ref: str, ref_txt: str, stream_mode: str = "token"):
+    """逐块推流原始 int16 PCM。infer_stream_async 内部已用 _infer_lock 串行化。
+
+    token 模式：首字延迟最低（~120ms），供后端实时播放；
+    sentence 模式：句子级块，听感更稳（无 boost 首字重复），供 demo/试听。
+    """
+    kw = dict(_STREAM_KW)
+    kw["stream_mode"] = stream_mode
+    if stream_mode == "sentence":
+        kw["boost_first_chunk"] = False
     t0 = time.perf_counter()
     emitted = 0
     async for audio in tts.infer_stream_async(
         spk_audio_path=ref, prompt_audio_path=ref, prompt_audio_text=ref_txt,
-        text=text, **_STREAM_KW,
+        text=text, **kw,
     ):
         if emitted == 0:
             logger.info(f"[TTFT] 首块 {(time.perf_counter() - t0) * 1000:.0f} ms")
@@ -183,6 +191,7 @@ class TTSRequest(BaseModel):
     text: str
     emotion: str = "平淡"
     speaker: str = "firefly"
+    stream_mode: str = "token"   # token(最低首字延迟) | sentence(句子级，听感更稳)
 
 
 @app.on_event("startup")
@@ -202,10 +211,12 @@ async def tts_endpoint(req: TTSRequest) -> StreamingResponse:
         raise HTTPException(status_code=400, detail="text 不能为空")
     if req.emotion not in EMO:
         raise HTTPException(status_code=400, detail=f"未知情绪: {req.emotion}，可选 {'/'.join(EMO)}")
+    if req.stream_mode not in ("token", "sentence"):
+        raise HTTPException(status_code=400, detail="stream_mode 只能为 token 或 sentence")
     ref = str(REF_DIR / EMO[req.emotion][0])
     if not os.path.exists(ref):
         raise HTTPException(status_code=500, detail=f"缺参考音频: {ref}")
-    return StreamingResponse(_stream(req.text, ref, EMO[req.emotion][1]),
+    return StreamingResponse(_stream(req.text, ref, EMO[req.emotion][1], req.stream_mode),
                              media_type="audio/L16; rate=32000; channels=1")
 
 
@@ -249,35 +260,42 @@ async function play() {
   const resp = await fetch('/api/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, emotion }),
+    body: JSON.stringify({ text, emotion, stream_mode: 'sentence' }),  // 试听用句子级，听感更稳
   });
   if (!resp.ok) { log('HTTP ' + resp.status + ' ' + await resp.text()); return; }
 
   const reader = resp.body.getReader();
   let buf = new Uint8Array(0);
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (!value) continue;
-    const merged = new Uint8Array(buf.length + value.length);
-    merged.set(buf); merged.set(value, buf.length); buf = merged;
-    const n = buf.length - (buf.length % 2);
-    if (n > 0) {
-      const int16 = new Int16Array(buf.buffer, 0, n / 2);
-      const f32 = new Float32Array(n / 2);
-      for (let i = 0; i < f32.length; i++) f32[i] = int16[i] / 32768;
-      const ab = ctx.createBuffer(1, f32.length, 32000);
-      ab.copyToChannel(f32, 0);
-      const src = ctx.createBufferSource();
-      src.buffer = ab; src.connect(ctx.destination); src.start(nextTime);
-      nextTime += ab.duration;
-      chunks++; totalSamples += f32.length;
-      if (firstMs === null) {
-        firstMs = performance.now() - t0;
-        log('首音频块: <b>' + firstMs.toFixed(0) + ' ms</b>  ← 首字延迟');
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      const merged = new Uint8Array(buf.length + value.length);
+      merged.set(buf); merged.set(value, buf.length); buf = merged;
+      const n = buf.length - (buf.length % 2);
+      if (n > 0) {
+        const int16 = new Int16Array(buf.buffer, 0, n / 2);
+        const f32 = new Float32Array(n / 2);
+        for (let i = 0; i < f32.length; i++) f32[i] = int16[i] / 32768;
+        const ab = ctx.createBuffer(1, f32.length, 32000);
+        ab.copyToChannel(f32, 0);
+        const src = ctx.createBufferSource();
+        src.buffer = ab; src.connect(ctx.destination);
+        // 钳制：start 时间不落过去，避免块重叠同时播放
+        nextTime = Math.max(nextTime, ctx.currentTime + 0.03);
+        src.start(nextTime);
+        nextTime += ab.duration;
+        chunks++; totalSamples += f32.length;
+        if (firstMs === null) {
+          firstMs = performance.now() - t0;
+          log('首音频块: <b>' + firstMs.toFixed(0) + ' ms</b>  ← 首字延迟');
+        }
+        buf = buf.slice(n);
       }
-      buf = buf.slice(n);
     }
+  } catch (e) {
+    log('播放错误: ' + e.message);
   }
   log('块数: ' + chunks + '，音频总长: ' + (totalSamples / 32000).toFixed(2) + 's，端到端: ' + (performance.now() - t0).toFixed(0) + ' ms');
 }
