@@ -34,3 +34,11 @@ reference_audio/*.mp3
 .idea/
 .vscode/
 *.log
+
+# WSL 开发日志
+*.log
+OVERNIGHT_STATUS.txt
+
+# 训练中间产物（不应入库）
+data/
+exp/
