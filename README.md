@@ -63,8 +63,10 @@ Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多�
 
 | 文件 | 大小 | 说明 |
 |---|---|---|
-| `models/gpt_firefly_678orig-e15.ckpt` | ~150MB | s1 GPT（文本→语义 token） |
-| `models/sovits_firefly_678orig_e10.pth` | ~165MB | s2 SoVITS（语义→音频），与成功 torch 基准逐字节一致 |
+| `models/gpt_firefly_678orig-e15.ckpt` | ~150MB | s1 GPT（文本→语义 token），v2 中文 |
+| `models/sovits_firefly_678orig_e10.pth` | ~165MB | s2 SoVITS（语义→音频），v2 中文，与成功 torch 基准逐字节一致 |
+| `models/gpt_firefly_v3-e15.ckpt` | ~150MB | s1 GPT，**v3 多语言**（中/英/日/混合） |
+| `models/sovits_firefly_v3_e10.pth` | ~165MB | s2 SoVITS，**v3 多语言** |
 | `models/genie/firefly_678orig/` | ~321MB | ~~旧 genie ONNX 产物~~（已弃用，保留参考） |
 
 > 模型文件与 `runs/Airi_678orig_v2ProPlus_v2`（WSL torch 推理基准）所用权重**逐字节一致**（1MB 头哈希已核对）。
@@ -88,6 +90,31 @@ Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多�
 ### 语言支持
 - **引擎支持中日英**（G2P/BERT 前端 + `text_language` 参数）。
 - ⚠️ **firefly 模型只训了中文**：英/日会念不准甚至乱。要英日好需训多语数据或换语种现成角色模型。
+
+---
+
+## 五·五、v3 多语言（2026-08-03）
+
+**目标**：在 v2 中文基础上，让流萤会中/英/日 + 中英混说（code-switching）。
+
+**多语言数据集**（`data/firefly_multilingual/`，1158 条）：
+| 语种 | 条数 | 来源 |
+|---|---|---|
+| 中文 | 678 | 原 v2 数据（复制到统一目录） |
+| 英文 | 200 | firefly 台词翻译（SJTU qwen3.6-27b）+ **CosyVoice3 音色克隆** |
+| 日文 | 200 | 同上 |
+| 中英/中日混合 | 80 | SJTU 生成混合台词 + CosyVoice3 克隆 |
+
+生成管线（Windows）：
+- `tools/prep_multilingual.py` —— 翻译（qwen3.6-27b，每 key 10 次/分限速，断点续传）
+- `tools/gen_codeswitch.py` —— 生成混合语种台词源
+- `tools/gen_multilingual.py` / `gen_multilingual_mix.py` —— CosyVoice3 instruct2 克隆合成（firefly 音色）
+- `tools/assemble_multilingual.py` —— 组装 train.list（/mnt/e 路径，2-get-hubert 要求 wav 平铺）
+
+**v3 训练**（WSL，`tools/run_v3_pipeline.sh`）：`firefly_v3`，v2ProPlus，s2 10ep + s1 15ep。
+权重：`models/gpt_firefly_v3-e15.ckpt` + `models/sovits_firefly_v3_e10.pth`。
+
+**验证**：`tools/gen_v3_demo.py` → `output/v3_demo/`（zh/en/ja/mix 各一句，试听确认多语言效果）。
 
 ---
 
@@ -159,7 +186,9 @@ python tools/tts_server.py        # 首次自动下载预训练模型到 gsv_mod
 - [x] **GSV-TTS-Lite 替换**：Windows GPU 部署，质量=torch，TTFT ~120ms，token 级流式
 - [x] 流式 TTS 服务 `tools/tts_server.py`：`/api/tts` 流式 + `/demo` 试听 + `--bench`/`--compare`
 - [x] 参考音频修正：撒娇甜（蛋糕卷桥段）、生气（7.09s 171）
+- [x] **v3 多语言**：翻译 + CosyVoice3 克隆生成 480 条多语言数据 → 训练 `firefly_v3`（中/英/日/混合）→ demo 验证
 - [ ] AiriLife 端对接（流式消费 / QQ 语音）
+- [ ] v3 换用英语/日语参考音频优化英日音色
 
 ---
 
@@ -171,11 +200,16 @@ python tools/tts_server.py        # 首次自动下载预训练模型到 gsv_mod
 ├── tools/                 # 核心脚本
 │   ├── tts_server.py      # 流式 TTS 服务（GSV 后端）：server / --bench / --compare / /demo
 │   ├── run_overnight_pipeline.sh
+│   ├── run_v3_pipeline.sh # v3 多语言训练管线（WSL）
+│   ├── prep_multilingual.py / gen_codeswitch.py / gen_multilingual.py / gen_multilingual_mix.py / assemble_multilingual.py
+│   ├── gen_v3_demo.py     # v3 多语言验证
 │   ├── infer_emotions.py
 │   └── export_ckpt.py
 ├── models/                # Git LFS
 │   ├── gpt_firefly_678orig-e15.ckpt
 │   ├── sovits_firefly_678orig_e10.pth
+│   ├── gpt_firefly_v3-e15.ckpt      # v3 多语言
+│   ├── sovits_firefly_v3_e10.pth    # v3 多语言
 │   └── genie/firefly_678orig/   # 已弃用 ONNX
 ├── reference_audio/       # 8 情绪原声参考（撒娇甜/生气已换新）
 ├── gsv_models/            # GSV 预训练模型（cnhubert/roberta/g2p/sv，~1.3GB，gitignore）
