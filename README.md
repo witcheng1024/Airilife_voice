@@ -1,10 +1,10 @@
-# AiriLife 流萤语音 v2 — GPT-SoVITS v2ProPlus + Genie-TTS
+# AiriLife 流萤语音 v2 — GPT-SoVITS v2ProPlus + GSV-TTS-Lite
 
 Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多情绪表达**的本地 TTS，满足桌宠实时性要求。
 
 > 本分支（`v2`）是 GPT-SoVITS 方案。旧 CosyVoice3 方案在 `master` 分支，已弃用。
 >
-> 开发/训练在 WSL2（`/home/witcheng/PROJECT/AiriLife_voice`），git 仓库在 Windows（`E:\PROJECT\Airilife_voice`）。
+> 训练在 WSL2，**推理/部署在 Windows**（GPU：RTX 4070 Laptop）。
 
 ---
 
@@ -12,31 +12,32 @@ Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多�
 
 | 环节 | 方案 | 说明 |
 |---|---|---|
-| 训练 | GPT-SoVITS **v2ProPlus** | 最终要转 genie，必须 v2ProPlus（v2Pro 与 genie 骨架不兼容） |
-| 推理加速 | **Genie-TTS 2.0.2** | GPT-SoVITS 的 ONNX 推理引擎，CPU/GPU 均可，首包 ~1s |
-| 声线方案 | **原声数据训练 + 参考音频带情绪/年龄感** | EQ/asetrate 变调全部无效，年轻感只能靠推理时换参考 |
+| 训练 | GPT-SoVITS **v2ProPlus** | 678 条原声训练，s1=e15 / s2=e10 |
+| 推理引擎 | **GSV-TTS-Lite 0.4.7** | 纯 PyTorch GPU 推理（CUDA Graph / Nested KV Cache / fp16），**质量 = 官方 torch** |
+| ~~genie-tts~~ | ~~ONNX 引擎~~ | ~~已弃用：ONNX 有音色退化 + 尾字截断（genie issue #31）~~ |
+| 声线方案 | 原声数据训练 + 参考音频带情绪/年龄感 | EQ/asetrate 变调无效，年轻感靠推理时换参考 |
 
-**为什么不用 EQ/变调**：G1-G6 多档 EQ 实测无效（除杂声变大无听感变化）；asetrate +2/+3 失败（尖而不幼）。唯一可行的年轻化路径 = 原声训练 + 年轻参考。
+**为什么弃 genie-tts 换 GSV-TTS-Lite**：genie 走 ONNX 转换，v2ProPlus 中文在断句/语调/音色上有系统性退化（尾字截断、音色不到位），且是上游 open issue。GSV-TTS-Lite 不转 ONNX、不改权重，只优化执行方式（CUDA Graph/KV Cache/fp16/batching），**质量与官方 PyTorch 一致**，速度 3~4x、显存减半。
 
 ---
 
 ## 二、数据
 
-- **训练数据**：`data/firefly_678_orig` — 678 条**原声**（从 911 条 `firefly_clean` 里筛出），**无任何 asetrate/EQ 处理**。`train.list` 从 young_full 清单改路径前缀生成。
+- **训练数据**：`data/firefly_678_orig` — 678 条**原声**（无 asetrate/EQ 处理）。
 - **情绪参考**（推理时用，本仓库 `reference_audio/`）：8 情绪原声样本
 
 | 情绪 | 参考样本 | 参考文本 |
 |---|---|---|
 | 平淡 | `chapter3_2_firefly_223` | 我叫流萤，是鸢尾花家系的艺者。 |
 | 活泼 | `chapter3_2_firefly_164` | 好啦！看上去真不错，你好上相呀。 |
-| 撒娇甜 | `chapter3_2_firefly_163` | 你想合影留念吗？那就把手机交给我吧，我来拍～ |
+| 撒娇甜 | `chapter3_2_firefly_135`（蛋糕卷桥段） | 我最喜欢这家店的橡木蛋糕卷，每天都要吃一个。 |
 | 温柔 | `chapter3_3_firefly_177` | 这里是游客不会踏足的拓荒地，所以不像市中心那样热闹…但我很喜欢这种僻静的气氛。 |
 | 悲伤 | `chapter3_30_firefly_125` | 嗯，是我不好。对不起。 |
 | 惊讶 | `chapter3_30_firefly_123` | 真的吗？看来…卡芙卡教给我的没错。 |
-| 生气 | `chapterfinality1_4_firefly_169_f` | 绝对不行，得把她和{NICKNAME}分开。 |
+| 生气 | `chapterfinality1_4_firefly_171`（7.09s） | 绝对不行，难道你忘了吗？作为星核猎手，我有一项不惜一切代价的「零点任务」—— |
 | 紧张 | `chapter3_20_firefly_162` | 小心，更多怪物进来了！准备开火！ |
 
-> 参考必须与音频文本匹配（`prompt_text`）。选样本注意情绪纯粹性（曾踩坑：温柔样本选成道歉语气）。
+> 参考必须与音频文本匹配（`prompt_text`）。曾踩坑：生气提交过 2.6s 的 169_f 剪辑（<3s，genie 直接警告、合成全乱）；撒娇甜换过 163 合影句，不够甜 → 换成蛋糕卷桥段。
 
 ---
 
@@ -51,18 +52,10 @@ Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多�
   bash tools/run_overnight_pipeline.sh --skip-process --skip-features   # 复用已有数据/特征
 ```
 
-配套脚本（放在 GPT-SoVITS 目录）：
-- `auto_s2train.sh` / `monitor_train.sh`（s2 崩溃自动续训，第 3 参数 VERSION 默认 v2Pro）
-- `run_young_features.sh`（特征提取，第 3 参数 VERSION）
-- `tools/export_ckpt.py`（s2 权重导出，支持 `--version v2ProPlus` 字节 06）
-
-### v2ProPlus vs v2Pro 关键差异
-`upsample_initial_channel 512→768`、`upsample_kernel_sizes [16,16,8,2,2]→[20,16,8,2,2]`、`lora_rank=32`、预训练换 `s2Gv2ProPlus.pth / s2Dv2ProPlus.pth`、`version=v2ProPlus`。
+配套脚本（放在 GPT-SoVITS 目录）：`auto_s2train.sh` / `monitor_train.sh`（崩溃自动续训）、`run_young_features.sh`、`tools/export_ckpt.py`。
 
 ### ⚠️ 重大教训：预训练路径必须绝对路径
-`tmp_s2.json` 的 `pretrained_s2G/s2D` 若用相对路径 `GPT_SoVITS/pretrained_models/...`，`auto_s2train.sh` 在 `$BASE/GPT_SoVITS` 下运行时 `os.path.exists()==False` → **预训练被静默跳过，模型随机初始化**。v2ProPlus 量化器 `kmeans_init=True` 会用首 batch 重建 codebook（近零）→ genie 转换后用近零 codebook 建 t2s_encoder → 输出高频噪声/空音频。
-
-**验证训练正确**：`log_s2_auto.txt` 应出现 `loaded pretrained ... <All keys matched successfully>` 且**无** `kmeans start`。
+`tmp_s2.json` 的 `pretrained_s2G/s2D` 若用相对路径 → 预训练被静默跳过、模型随机初始化 → genie 转换后输出高频噪声/空音频。验证：`log_s2_auto.txt` 应出现 `loaded pretrained ... All keys matched successfully` 且无 `kmeans start`。
 
 ---
 
@@ -71,87 +64,121 @@ Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多�
 | 文件 | 大小 | 说明 |
 |---|---|---|
 | `models/gpt_firefly_678orig-e15.ckpt` | ~150MB | s1 GPT（文本→语义 token） |
-| `models/sovits_firefly_678orig_e10.pth` | ~165MB | s2 SoVITS（语义→音频） |
-| `models/genie/firefly_678orig/` | ~321MB | genie ONNX 产物（vits/t2s_encoder/t2s_shared/prompt_encoder） |
+| `models/sovits_firefly_678orig_e10.pth` | ~165MB | s2 SoVITS（语义→音频），与成功 torch 基准逐字节一致 |
+| `models/genie/firefly_678orig/` | ~321MB | ~~旧 genie ONNX 产物~~（已弃用，保留参考） |
+
+> 模型文件与 `runs/Airi_678orig_v2ProPlus_v2`（WSL torch 推理基准）所用权重**逐字节一致**（1MB 头哈希已核对）。
 
 ---
 
-## 五、推理
+## 五、推理与实时性（实测数据表）
 
-### 1. PyTorch（GPT-SoVITS，精度最高）
+实测环境：**Windows / RTX 4070 Laptop GPU / torch 2.11.0+cu128 / gsv-tts-lite 0.4.7 / 参考音频预缓存**
+
+| 指标 | 实测值 | 说明 |
+|---|---|---|
+| **首字延迟（TTFT）** | **~120 ms**（warm HTTP 首音频字节） | token 级流式，比 genie ONNX(1.2~2.4s) 快一个数量级 |
+| TTFT（冷启动/首次） | 417–494 ms | bench 8 情绪均值 ~466ms |
+| 实时率 RTF | ~0.1 | GPU fp16，合成 3.6s 音频仅需 ~0.5s |
+| 流式粒度 | **token 级** | `stream_mode="token"`，25 token 一触发 vits |
+| 显存占用 | <1GB | Nested KV Cache + fp16 |
+
+**对比 genie-tts（已弃用）**：TTFT 1.2–2.4s（尾字被截断，音色/语调退化，open issue #31 未修）。
+
+### 语言支持
+- **引擎支持中日英**（G2P/BERT 前端 + `text_language` 参数）。
+- ⚠️ **firefly 模型只训了中文**：英/日会念不准甚至乱。要英日好需训多语数据或换语种现成角色模型。
+
+---
+
+## 六、流式 TTS 服务（`tools/tts_server.py`）
+
+引擎：GSV-TTS-Lite（torch GPU 推理，质量=torch）+ token 级流式。
+
 ```bash
-python tools/infer_emotions.py \
-  --s1 models/gpt_firefly_678orig-e15.ckpt \
-  --s2 models/sovits_firefly_678orig_e10.pth \
-  --ref-dir reference_audio/ \
-  --out <输出目录>
+# 启动服务（Windows）
+D:/miniforge3/envs/gsv/python.exe tools/tts_server.py          # 0.0.0.0:9880
+# 离线测各情绪首字延迟 + 存 wav
+D:/miniforge3/envs/gsv/python.exe tools/tts_server.py --bench
+# 生成与 torch 基准同文本音频（A/B 用）
+D:/miniforge3/envs/gsv/python.exe tools/tts_server.py --compare
 ```
 
-### 2. Genie（ONNX，实时）
-```python
-import os
-os.environ["GENIE_DATA_DIR"] = "/path/to/GenieData"
-import genie_tts as genie   # 注意包名是 genie_tts，不是 genie
+### API
 
-genie.convert_to_onnx(torch_ckpt_path=s1, torch_pth_path=s2, output_dir="genie/firefly_678orig")
-genie.load_character("firefly_678orig", "genie/firefly_678orig", "Chinese")
-genie.set_reference_audio("firefly_678orig", ref_wav, ref_text, "Chinese")
-genie.tts("firefly_678orig", text, save_path="out.wav")   # 返回 None，落盘到 save_path
+```
+POST /api/tts
+  {"text": "今天天气真好呢，我们去散步吧", "emotion": "温柔", "speaker": "firefly"}
+  → 200, Content-Type: audio/L16; rate=32000; channels=1
+    响应体 = 原始 int16 PCM 逐块流（token 级），首块到达即"首字延迟"
+GET /health      → 引擎/模型/GPU/情绪列表
+GET /demo        → 浏览器流式试听页（Web Audio 实时播放，验证流式用耳朵）
 ```
 
-GenieData（G2P、chinese-hubert-base、speaker_encoder）从 genie 官方下载；中文 RoBERTa 可选。
+### 试听验证（耳朵最精确）
+1. 启动服务后浏览器打开 **`http://localhost:9880/demo`**
+2. 选情绪、输入文本 → 点「生成并播放」
+3. 首字约 100–500ms 出声，之后连续播放；页面实时显示首块延迟/块数/音频总长
+
+### 输出目录
+- `output/bench/`    —— `--bench` 各情绪 wav（基准句）
+- `output/compare/`  —— `--compare` 各情绪 短句/长句 wav，与 `runs/Airi_678orig_v2ProPlus_v2/推理` 同名文件 A/B
+- `output/`、`GenieData/`、`gsv_models/` 均已 gitignore
 
 ---
 
-## 六、部署（桌宠 TTS 服务）
+## 七、部署（Windows/WSL 多端）
 
-**架构**：独立 FastAPI 服务（WSL，GPU 可选）→ AiriLife backend（Windows）通过 HTTP 调用。
+| 端 | 位置 | 环境 | 用途 |
+|---|---|---|---|
+| 训练/开发端 | WSL2 Ubuntu 24.04 | conda `tts` env（Python 3.11、torch 2.5.1+cu121、GPT-SoVITS 完整目录） | 训练、导出权重 |
+| **部署/推理端** | **Windows** | conda `gsv` env（Python 3.11 + torch cu128 + gsv-tts-lite，见 `requirements.txt`） | FastAPI 流式 TTS 服务 |
 
+**Windows 部署步骤**：
+```bash
+conda create -n gsv python=3.11 -y
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+pip install -r requirements.txt
+python tools/tts_server.py        # 首次自动下载预训练模型到 gsv_models/（~1.3GB）
 ```
-POST http://localhost:9880/api/tts
-Content-Type: application/json
-{
-  "text": "今天天气真好呢，我们去散步吧",
-  "emotion": "温柔",      // 平淡|活泼|撒娇甜|温柔|悲伤|惊讶|生气|紧张，默认平淡
-  "speaker": "firefly"
-}
-→ 200 OK, Content-Type: audio/wav
-```
 
-**部署资源**（实测）：
-- 硬盘：~720MB（genie onnx 321MB + GenieData 392MB + 参考 2MB）
-- 环境：Python 3.11 + `genie_tts` + `onnxruntime` + `fastapi`/`uvicorn`（**无需 PyTorch**）
-- 内存：~500MB-1GB（模型常驻）
-- GPU：可选（CPU 可跑，GPU ~1s/句）
-
-**完整开发环境**（对比）：conda `tts` env 8.5GB + GPT-SoVITS 完整目录 47GB。
+**多端注意事项**：
+- 路径映射：WSL2 `/mnt/e/PROJECT/Airilife_voice_v2` ≡ Windows `E:\PROJECT\Airilife_voice_v2`。
+- ⚠️ 本分支是 WSL 建的 linked worktree：`.git` 指向 `/mnt/e/...`，**Windows git 打不开本目录**；提交/推送去主仓库 `E:\PROJECT\Airilife_voice`（共享对象库，`git push origin v2`）。
+- GPU：Windows 用 CUDA 12.8；WSL2 内 CUDA 镜像内建。
 
 ---
 
-## 七、验证进度
+## 八、验证进度
 
 - [x] genie-tts 2.0.2 装于 `tts` conda 环境，`GENIE_DATA_DIR` 指向 GenieData
-- [x] v2Pro **不行**（转换成功但 ONNX 加载失败，骨架不兼容）
-- [x] v2ProPlus **可行**（晓伊v2 权重转换+推理正常）
-- [x] 定位 678orig genie 噪声根因 = 预训练未加载（codebook 近零），已修复重训
-- [ ] 重训后重新转 genie 验证（进行中）
-- [ ] TTS FastAPI 服务搭建
-- [ ] AiriLife 端对接（streaming 流式 / QQ 语音）
+- [x] v2Pro **不行**（ONNX 骨架不兼容）；v2ProPlus **可行**
+- [x] genie 噪声根因 = 预训练未加载（codebook 近零），重训修复
+- [x] 重训后转 genie 频谱正常，但**音色/尾字仍有退化 → 弃用 genie**
+- [x] **GSV-TTS-Lite 替换**：Windows GPU 部署，质量=torch，TTFT ~120ms，token 级流式
+- [x] 流式 TTS 服务 `tools/tts_server.py`：`/api/tts` 流式 + `/demo` 试听 + `--bench`/`--compare`
+- [x] 参考音频修正：撒娇甜（蛋糕卷桥段）、生气（7.09s 171）
+- [ ] AiriLife 端对接（流式消费 / QQ 语音）
 
 ---
 
-## 八、目录结构（本分支）
+## 九、目录结构（本分支）
 
 ```
 ├── README.md              # 本文档
-├── tools/                 # 核心脚本（训练管线/推理/导出）
+├── requirements.txt       # Windows 推理端依赖（torch cu128 + gsv-tts-lite + fastapi）
+├── tools/                 # 核心脚本
+│   ├── tts_server.py      # 流式 TTS 服务（GSV 后端）：server / --bench / --compare / /demo
 │   ├── run_overnight_pipeline.sh
 │   ├── infer_emotions.py
 │   └── export_ckpt.py
 ├── models/                # Git LFS
 │   ├── gpt_firefly_678orig-e15.ckpt
 │   ├── sovits_firefly_678orig_e10.pth
-│   └── genie/firefly_678orig/
-├── reference_audio/       # 8 情绪原声参考
+│   └── genie/firefly_678orig/   # 已弃用 ONNX
+├── reference_audio/       # 8 情绪原声参考（撒娇甜/生气已换新）
+├── gsv_models/            # GSV 预训练模型（cnhubert/roberta/g2p/sv，~1.3GB，gitignore）
+├── GenieData/             # genie 残留数据（gitignore）
+├── output/                # 推理输出（bench/compare/stream，gitignore）
 └── .gitattributes         # LFS 规则
 ```

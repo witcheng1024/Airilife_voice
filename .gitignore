@@ -14,6 +14,15 @@ CosyVoice/
 test_outputs/**/*.log
 test_outputs/run.log
 
+# genie-tts 运行时数据（G2P/hubert/speaker_encoder，~392MB，从 HuggingFace 下载）
+GenieData/
+
+# GSV-TTS-Lite 预训练模型（cnhubert/roberta/g2p/sv，~1.3GB，首次运行自动下载）
+gsv_models/
+
+# Claude 本地配置
+.claude/
+
 # macOS 测试输出（wav 太大不进 git）
 test_outputs_mac/
 output/

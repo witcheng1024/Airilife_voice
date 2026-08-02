@@ -1,0 +1,21 @@
+# AiriLife v2 TTS 推理服务 —— GSV-TTS-Lite（纯 PyTorch GPU 推理）
+#
+# 引擎：gsv-tts-lite 0.4.7。基于 GPT-SoVITS V2ProPlus 的 torch 推理，
+# 质量与官方 torch 一致（取代 genie-tts ONNX 方案）。token 级流式，RTX4070 实测首块 ~120ms。
+#
+# 安装：
+#   1) Python 3.11 环境：
+#        conda create -n gsv python=3.11 -y
+#   2) 先装 torch（CUDA 12.8，对应 RTX 40 系；无 GPU 则去掉 --index-url 装 CPU 版）：
+#        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+#   3) 再装本文件：
+#        pip install -r requirements.txt
+#
+# 首次运行 tools/tts_server.py 会自动下载预训练模型（cnhubert/roberta/g2p/sv，~1.3GB）到 gsv_models/
+
+gsv-tts-lite==0.4.7
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+pydantic==2.13.4
+numpy
+soundfile
