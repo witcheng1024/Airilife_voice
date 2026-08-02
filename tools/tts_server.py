@@ -37,8 +37,9 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = ROOT / "gsv_models"
-GPT = ROOT / "models" / "gpt_firefly_678orig-e15.ckpt"
-SOV = ROOT / "models" / "sovits_firefly_678orig_e10.pth"
+# 模型可选：默认 v2 中文；设环境变量 GSV_GPT/GSV_SOV 切 v3 多语言（如 firefly_v3）
+GPT = Path(os.environ.get("GSV_GPT", ROOT / "models" / "gpt_firefly_678orig-e15.ckpt"))
+SOV = Path(os.environ.get("GSV_SOV", ROOT / "models" / "sovits_firefly_678orig_e10.pth"))
 REF_DIR = ROOT / "reference_audio"
 SR = 32000
 PORT = 9880
@@ -105,7 +106,7 @@ def _write_wav(path: Path, pcm: bytes) -> None:
 
 
 _STREAM_KW = dict(
-    text_language="zh", prompt_language="zh",
+    text_language="auto", prompt_language="zh",  # auto：支持中/英/日/混合（v3 多语言）
     stream_mode="token", boost_first_chunk=True, debug=False,
 )
 
