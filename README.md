@@ -64,11 +64,13 @@ Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多�
 | 文件 | 大小 | 说明 |
 |---|---|---|
 | `models/gpt_firefly_678orig-e15.ckpt` | ~150MB | s1 GPT（文本→语义 token），v2 中文 |
-| `models/sovits_firefly_678orig_e10.pth` | ~165MB | s2 SoVITS（语义→音频），v2 中文，与成功 torch 基准逐字节一致 |
-| `models/gpt_firefly_v3-e15.ckpt` | ~150MB | s1 GPT，**v3 多语言**（e15，发音相对更清晰） |
-| `models/gpt_firefly_v3-e45.ckpt` | ~150MB | s1 GPT，**v3 多语言**（续训到 e45，acc↑ 但发音更糊，待排查） |
-| `models/sovits_firefly_v3_e10.pth` | ~165MB | s2 SoVITS，**v3 多语言**（未续训） |
+| `models/sovits_firefly_678orig_e10.pth` | ~165MB | s2 SoVITS（语义→音频），v2 中文 |
+| `models/gpt_firefly_v3-e15.ckpt` | ~150MB | s1 GPT，**v3 多语言** e15（发音较清晰，备选） |
+| `models/gpt_firefly_v3-e20.ckpt` | ~150MB | s1 GPT，**v3 多语言** e20（**定版**） |
+| `models/sovits_firefly_v3_e{30,35,40,45,50}_cont.pth` | 各~165MB | s2 SoVITS，**v3 多语言** e30-e50（**e40 定版**，s2 越大越好） |
 | `models/genie/firefly_678orig/` | ~321MB | ~~旧 genie ONNX 产物~~（已弃用，保留参考） |
+
+> 定版组合：**s1e20_s2e40 + text_language=zh**。v3 网格排查结论：s1≈15-20 最优（>20 过拟合），s2 越大越好（e50 未过拟合）。
 
 > 模型文件与 `runs/Airi_678orig_v2ProPlus_v2`（WSL torch 推理基准）所用权重**逐字节一致**（1MB 头哈希已核对）。
 
