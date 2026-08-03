@@ -202,7 +202,8 @@ async def _startup() -> None:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "engine": "gsv-tts-lite", "model": "firefly_678orig",
+    return {"ok": True, "engine": "gsv-tts-lite",
+            "model": f"{GPT.stem} + {SOV.stem}",
             "device": "gpu", "emotions": list(EMO)}
 
 
