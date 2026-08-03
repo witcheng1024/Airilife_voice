@@ -74,7 +74,7 @@ def _split_sentences(text: str) -> list[tuple[str, str, str]]:
     return result
 
 
-def synth_dialogue(tts, ref: str, ref_txt: str, chunks: list[tuple[str, str, str]]):
+def synth_dialogue(tts, ref: str, ref_txt: str, chunks: list[tuple[str, str, str]], lang: str = "zh"):
     """逐 chunk 合成，插入标点/动作停顿，返回 (audio, sr)。
 
     chunk: ('action', '（...）', '') 或 ('speech', text, end_punct)
@@ -89,7 +89,7 @@ def synth_dialogue(tts, ref: str, ref_txt: str, chunks: list[tuple[str, str, str
         else:  # speech
             audio = tts.infer(
                 spk_audio_path=ref, prompt_audio_path=ref, prompt_audio_text=ref_txt,
-                text=content, text_language="auto", prompt_language="zh",
+                text=content, text_language=lang, prompt_language="zh",
             )
             sr = audio.samplerate
             if parts and prev_punct:  # 上句结束的标点停顿
@@ -105,10 +105,11 @@ def main() -> None:
 
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--text", default=EXAMPLE)
-    ap.add_argument("--gpt", default=str(ROOT / "models" / "gpt_firefly_v3-e15.ckpt"))
+    ap.add_argument("--gpt", default=str(ROOT / "models" / "gpt_firefly_v3-e20.ckpt"))
     ap.add_argument("--sovits", default=str(ROOT / "models" / "sovits_firefly_v3_e40_cont.pth"))
     ap.add_argument("--ref", default=str(ROOT / "reference_audio" / "活泼.wav"))
     ap.add_argument("--ref-text", default="好啦！看上去真不错，你好上相呀。")
+    ap.add_argument("--lang", default="zh", help="text_language: zh 或 auto")
     ap.add_argument("--out", default=str(ROOT / "output" / "v3_style" / "dialogue_demo.wav"))
     args = ap.parse_args()
 
@@ -123,7 +124,7 @@ def main() -> None:
     tts = TTS(models_dir=str(ROOT / "gsv_models"), use_bert=True)
     tts.load_gpt_model(args.gpt)
     tts.load_sovits_model(args.sovits)
-    full, sr = synth_dialogue(tts, args.ref, args.ref_text, chunks)
+    full, sr = synth_dialogue(tts, args.ref, args.ref_text, chunks, lang=args.lang)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     sf.write(str(out), full, sr)
