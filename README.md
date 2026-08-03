@@ -188,7 +188,7 @@ python tools/tts_server.py        # 首次自动下载预训练模型到 gsv_mod
 - [x] 流式 TTS 服务 `tools/tts_server.py`：`/api/tts` 流式 + `/demo` 试听 + `--bench`/`--compare`
 - [x] 参考音频修正：撒娇甜（蛋糕卷桥段）、生气（7.09s 171）
 - [x] **v3 多语言**：翻译 + CosyVoice3 克隆生成 480 条多语言数据 → 训练 `firefly_v3`（中/英/日/混合）→ demo 验证
-- [ ] ⚠️ **v3 中文发音模糊（待排查）**：s1 e15→e45 续训后更糊（acc↑ 反而更差），疑 s2 未续训/过拟合/多语言数据稀释。日志在 `docs/v3_training_logs/`，排查说明见其 README
+- [ ] ⚠️ **v3 中文发音模糊（待排查）**：已铺 **63 组 s1×s2 网格**（s1 e5-45 × s2 e10-40，5epoch 间隔），见 `output/v3_combos/`（每组 8 情绪）。日志在 `docs/v3_training_logs/`
 - [ ] AiriLife 端对接（流式消费 / QQ 语音）
 - [ ] v3 换用英语/日语参考音频优化英日音色
 
