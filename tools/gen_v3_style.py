@@ -18,8 +18,9 @@ WSL_GPT = "//wsl$/Ubuntu24.04/home/witcheng/PROJECT/TTS-Server/train/GPT-SoVITS/
 WSL_SOV = "//wsl$/Ubuntu24.04/home/witcheng/PROJECT/TTS-Server/train/GPT-SoVITS/GPT_SoVITS/SoVITS_weights_v2ProPlus"
 
 COMBOS = {
-    "s1e15_s2e40": (f"{WSL_GPT}/firefly_v3-e15.ckpt", f"{WSL_SOV}/firefly_v3_e40_cont.pth"),
-    "s1e15_s2e50": (f"{WSL_GPT}/firefly_v3-e15.ckpt", f"{WSL_SOV}/firefly_v3_e50_cont.pth"),
+    f"s1e{s1}_s2e{s2}": (f"{WSL_GPT}/firefly_v3-e{s1}.ckpt", f"{WSL_SOV}/firefly_v3_e{s2}_cont.pth")
+    for s1 in [15, 20]
+    for s2 in [40, 50]
 }
 
 # 语种策略文本：(情绪, 参考文件, 参考文本, 目标文本)
