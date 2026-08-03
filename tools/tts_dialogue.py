@@ -35,10 +35,10 @@ PAUSE_SEC = {
     "。": 0.55, "？": 0.55, "！": 0.55,
     "；": 0.40, "…": 0.45,
     "，": 0.28, "、": 0.15,
-    "action": 0.55,
+    "action": 1.00,  # 动作停顿 > 句号，便于区分
 }
 JA_RE = re.compile(r"[ぁ-んァ-ヶ]")  # 日文假名
-MAX_CHARS = 25  # 超过此长度的句子按逗号再拆，控首字延迟
+MAX_CHARS = 30  # 超长句按逗号再拆（控首字延迟）；不拆顿号，避免把日文词拆散
 
 EXAMPLE = (
     "（轻轻拉了拉你的衣角）哥哥，今天想不想试试这个 Python 的新玩法？"
@@ -85,15 +85,15 @@ def _split_sentences(text: str, max_chars: int) -> list[tuple[str, str, str]]:
 
 
 def _subsplit_long(sentence: str, max_chars: int, end_punct: str) -> list[tuple[str, str, str]]:
-    """句子过长时按逗号/顿号拆成子句（每子句独立合成，减少单次推理长度）。"""
+    """超长句按逗号拆子句（控首字延迟）。只拆 ，不拆 、，避免把日文词/并列拆散。"""
     eff = sum(2 if ord(ch) > 127 else 1 for ch in sentence)  # 汉字算2
-    if eff <= max_chars or end_punct == "":
+    if eff <= max_chars:
         return [("speech", sentence, end_punct)]
     parts = []
     buf = ""
     for c in sentence:
         buf += c
-        if c in "，、；" and sum(2 if ord(x) > 127 else 1 for x in buf) >= 8:
+        if c == "，" and sum(2 if ord(x) > 127 else 1 for x in buf) >= 10:
             parts.append(("speech", buf.strip(), c))
             buf = ""
     if buf.strip():
