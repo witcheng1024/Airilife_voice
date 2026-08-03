@@ -37,7 +37,8 @@ PAUSE_SEC = {
     "，": 0.28, "、": 0.15,
     "action": 1.00,  # 动作停顿 > 句号，便于区分
 }
-JA_RE = re.compile(r"[ぁ-んァ-ヶ]")  # 日文假名
+# 含外文(日文假名/英文)的段用 auto：zh 模式遇英文词会慢 3-4 倍、不念日文
+FOREIGN_RE = re.compile(r"[ぁ-んァ-ヶ]|[a-zA-Z]")
 MAX_CHARS = 30  # 超长句按逗号再拆（控首字延迟）；不拆顿号，避免把日文词拆散
 
 EXAMPLE = (
@@ -102,6 +103,8 @@ def _subsplit_long(sentence: str, max_chars: int, end_punct: str) -> list[tuple[
 
 
 def main() -> None:
+    import time
+
     import soundfile as sf
 
     ap = argparse.ArgumentParser(description=__doc__)
@@ -125,20 +128,29 @@ def main() -> None:
     tts = TTS(models_dir=str(ROOT / "gsv_models"), use_bert=True)
     tts.load_gpt_model(args.gpt)
     tts.load_sovits_model(args.sovits)
+    # 预热：模型刚加载首次推理含 CUDA 图编译，多预热几档（短/中/含英文）让 TTFT 反映稳态
+    for wt in ("预热。", "今天天气不错，我们出去走走吧。", "哥哥，这个 Python 的新玩法真的很有趣哦！"):
+        tts.infer(spk_audio_path=args.ref, prompt_audio_path=args.ref, prompt_audio_text=args.ref_text,
+                  text=wt, text_language="zh", prompt_language="zh")
 
     # 生成器消费：拼接成 wav；服务端可改为逐 chunk 流式播放
     parts, sr = [], 32000
     prev_punct = ""
+    ttft_ms = None
+    t0 = time.perf_counter()
     for typ, content, end_punct in chunks:
         if typ == "action":
             parts.append(np.zeros(int(PAUSE_SEC["action"] * 32000), dtype=np.float32))
             prev_punct = ""
         else:
-            seg_lang = "auto" if JA_RE.search(content) else args.lang
+            seg_lang = "auto" if FOREIGN_RE.search(content) else args.lang
             audio = tts.infer(
                 spk_audio_path=args.ref, prompt_audio_path=args.ref, prompt_audio_text=args.ref_text,
                 text=content, text_language=seg_lang, prompt_language="zh",
             )
+            if ttft_ms is None:  # 首个语音段就绪时间 = 首字延迟
+                ttft_ms = (time.perf_counter() - t0) * 1000
+                print(f"首字延迟(TTFT): {ttft_ms:.0f} ms", flush=True)
             sr = audio.samplerate
             if parts and prev_punct:
                 parts.append(np.zeros(int(PAUSE_SEC.get(prev_punct, 0.3) * sr), dtype=np.float32))
