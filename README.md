@@ -115,7 +115,8 @@ Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多�
 **v3 训练**（WSL，`tools/run_v3_pipeline.sh`）：`firefly_v3`，v2ProPlus，s2 10ep + s1 15ep。
 权重：`models/gpt_firefly_v3-e15.ckpt` + `models/sovits_firefly_v3_e10.pth`。
 
-**验证**：`tools/gen_v3_demo.py` → `output/v3_demo/`（zh/en/ja/mix 各一句，试听确认多语言效果）。
+**验证/生成**：统一入口 `tools/gen_v3.py`（子命令：demo / emotions / combos / long / style，默认定版 s1e20_s2e40 + zh），输出 `output/v3_samples/`。
+桌宠对话格式（`（动作）台词`）用 `tools/tts_dialogue.py`（动作停顿 + 标点分档停顿 + 分句绕截断）。
 
 ---
 
@@ -204,7 +205,8 @@ python tools/tts_server.py        # 首次自动下载预训练模型到 gsv_mod
 │   ├── run_overnight_pipeline.sh
 │   ├── run_v3_pipeline.sh # v3 多语言训练管线（WSL）
 │   ├── prep_multilingual.py / gen_codeswitch.py / gen_multilingual.py / gen_multilingual_mix.py / assemble_multilingual.py
-│   ├── gen_v3_demo.py     # v3 多语言验证
+│   ├── gen_v3.py          # v3 统一生成/测试（demo/emotions/combos/long/style）
+│   ├── tts_dialogue.py    # 桌宠对话格式 TTS（动作+标点停顿）
 │   ├── infer_emotions.py
 │   └── export_ckpt.py
 ├── models/                # Git LFS

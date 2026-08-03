@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""桌宠对话 TTS：支持「（动作）台词」格式 + 标点分档停顿。
+"""桌宠对话 TTS：支持「（动作）台词」格式 + 标点分档停顿 + 长文本拆分控首字延迟。
 
-格式：对话文本可含动作描述（全角/半角括号），动作不读出、只停顿。
-停顿按标点分级（参考口语停顿规律）：
-  句号/问号/叹号(。？！) > 分号(；) > 逗号(，) > 顿号(、)
+- 动作 `（...）`：不读出，只停顿（可多处）
+- 停顿按标点分级（。？！0.55s > ；0.40s > ，0.28s > 、0.15s，动作 0.55s）
+- 分句合成绕开 s1 提前 EOS 截断
+- 含日文假名的分句自动用 auto 语言（否则 zh 不念日文）
+- 超长句子（> max_chars）按逗号再拆，保证首字延迟低
+- synth_dialogue 是生成器：逐 chunk 产出音频，服务端可流式播放
 
 用法：
-  E:/PROJECT/Airilife_voice/.venv/Scripts/python.exe tools/tts_dialogue.py --text "..." --gpt ... --sovits ... --out xxx.wav
-  （也可不带 --text，用内置示例）
+  E:/PROJECT/Airilife_voice/.venv/Scripts/python.exe tools/tts_dialogue.py --text "..." --out xxx.wav
 """
 from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -32,21 +35,28 @@ PAUSE_SEC = {
     "。": 0.55, "？": 0.55, "！": 0.55,
     "；": 0.40, "…": 0.45,
     "，": 0.28, "、": 0.15,
-    "action": 0.55,  # 动作（...）停顿
+    "action": 0.55,
 }
-EXAMPLE = "（眼睛亮晶晶地看着你手里的丝袜）嗯...今天想穿白色的！（接过丝袜坐在床边，抬起纤细的腿）哥哥帮我穿好不好？"
+JA_RE = re.compile(r"[ぁ-んァ-ヶ]")  # 日文假名
+MAX_CHARS = 25  # 超过此长度的句子按逗号再拆，控首字延迟
+
+EXAMPLE = (
+    "（轻轻拉了拉你的衣角）哥哥，今天想不想试试这个 Python 的新玩法？"
+    "……嗯，我觉得超有趣哦！（凑到你耳边小声说）不过也别太累；"
+    "累了就歇歇、喝口水吧——有我在呢。ごめんね、刚才是不是吓到你啦？"
+)
 
 
-def parse_dialogue(text: str) -> list[tuple[str, str]]:
-    """拆成 chunk 列表：(type, content)。type ∈ {'speech','action'}。"""
-    chunks: list[tuple[str, str]] = []
+def parse_dialogue(text: str, max_chars: int = MAX_CHARS) -> list[tuple[str, str, str]]:
+    """拆成 chunk 列表：(type, content, end_punct)。type ∈ {'speech','action'}。"""
+    chunks: list[tuple[str, str, str]] = []
     buf = ""
     i = 0
     while i < len(text):
         c = text[i]
         if c in "（(":  # 动作开始
             if buf.strip():
-                chunks.extend(_split_sentences(buf))
+                chunks.extend(_split_sentences(buf, max_chars))
                 buf = ""
             j = text.find("）" if c == "（" else ")", i + 1)
             action = text[i : j + 1] if j != -1 else text[i :]
@@ -56,48 +66,39 @@ def parse_dialogue(text: str) -> list[tuple[str, str]]:
             buf += c
             i += 1
     if buf.strip():
-        chunks.extend(_split_sentences(buf))
+        chunks.extend(_split_sentences(buf, max_chars))
     return chunks
 
 
-def _split_sentences(text: str) -> list[tuple[str, str, str]]:
-    """按句末标点切成句子（动作已剔除），返回 (type, text, end_punct)。"""
+def _split_sentences(text: str, max_chars: int) -> list[tuple[str, str, str]]:
+    """按句末标点切句；超长句再按逗号/顿号拆成子句（控首字延迟）。"""
     result: list[tuple[str, str, str]] = []
     buf = ""
     for c in text:
         buf += c
         if c in SENT_END:
-            result.append(("speech", buf.strip(), c))
+            result.extend(_subsplit_long(buf.strip(), max_chars, c))
             buf = ""
     if buf.strip():
-        result.append(("speech", buf.strip(), ""))
+        result.extend(_subsplit_long(buf.strip(), max_chars, ""))
     return result
 
 
-def synth_dialogue(tts, ref: str, ref_txt: str, chunks: list[tuple[str, str, str]], lang: str = "zh"):
-    """逐 chunk 合成，插入标点/动作停顿，返回 (audio, sr)。
-
-    chunk: ('action', '（...）', '') 或 ('speech', text, end_punct)
-    """
-    sr = 32000
-    parts: list[np.ndarray] = []
-    prev_punct = ""
-    for typ, content, end_punct in chunks:
-        if typ == "action":
-            parts.append(np.zeros(int(PAUSE_SEC["action"] * sr), dtype=np.float32))
-            prev_punct = ""
-        else:  # speech
-            audio = tts.infer(
-                spk_audio_path=ref, prompt_audio_path=ref, prompt_audio_text=ref_txt,
-                text=content, text_language=lang, prompt_language="zh",
-            )
-            sr = audio.samplerate
-            if parts and prev_punct:  # 上句结束的标点停顿
-                parts.append(np.zeros(int(PAUSE_SEC.get(prev_punct, 0.3) * sr), dtype=np.float32))
-            parts.append(audio.audio_data)
-            prev_punct = end_punct
-    full = np.concatenate(parts) if parts else np.zeros(0, dtype=np.float32)
-    return full, sr
+def _subsplit_long(sentence: str, max_chars: int, end_punct: str) -> list[tuple[str, str, str]]:
+    """句子过长时按逗号/顿号拆成子句（每子句独立合成，减少单次推理长度）。"""
+    eff = sum(2 if ord(ch) > 127 else 1 for ch in sentence)  # 汉字算2
+    if eff <= max_chars or end_punct == "":
+        return [("speech", sentence, end_punct)]
+    parts = []
+    buf = ""
+    for c in sentence:
+        buf += c
+        if c in "，、；" and sum(2 if ord(x) > 127 else 1 for x in buf) >= 8:
+            parts.append(("speech", buf.strip(), c))
+            buf = ""
+    if buf.strip():
+        parts.append(("speech", buf.strip(), end_punct))
+    return parts or [("speech", sentence, end_punct)]
 
 
 def main() -> None:
@@ -110,21 +111,41 @@ def main() -> None:
     ap.add_argument("--ref", default=str(ROOT / "reference_audio" / "活泼.wav"))
     ap.add_argument("--ref-text", default="好啦！看上去真不错，你好上相呀。")
     ap.add_argument("--lang", default="zh", help="text_language: zh 或 auto")
+    ap.add_argument("--max-chars", type=int, default=MAX_CHARS)
     ap.add_argument("--out", default=str(ROOT / "output" / "v3_style" / "dialogue_demo.wav"))
     args = ap.parse_args()
 
-    chunks = parse_dialogue(args.text)
+    chunks = parse_dialogue(args.text, args.max_chars)
     print("解析结果:")
     for typ, content, end_punct in chunks:
-        tag = end_punct if end_punct else ""
-        print(f"  [{typ}]{tag} {content!r}")
+        print(f"  [{typ}] {end_punct} {content!r}")
 
     from gsv_tts import TTS
 
     tts = TTS(models_dir=str(ROOT / "gsv_models"), use_bert=True)
     tts.load_gpt_model(args.gpt)
     tts.load_sovits_model(args.sovits)
-    full, sr = synth_dialogue(tts, args.ref, args.ref_text, chunks, lang=args.lang)
+
+    # 生成器消费：拼接成 wav；服务端可改为逐 chunk 流式播放
+    parts, sr = [], 32000
+    prev_punct = ""
+    for typ, content, end_punct in chunks:
+        if typ == "action":
+            parts.append(np.zeros(int(PAUSE_SEC["action"] * 32000), dtype=np.float32))
+            prev_punct = ""
+        else:
+            seg_lang = "auto" if JA_RE.search(content) else args.lang
+            audio = tts.infer(
+                spk_audio_path=args.ref, prompt_audio_path=args.ref, prompt_audio_text=args.ref_text,
+                text=content, text_language=seg_lang, prompt_language="zh",
+            )
+            sr = audio.samplerate
+            if parts and prev_punct:
+                parts.append(np.zeros(int(PAUSE_SEC.get(prev_punct, 0.3) * sr), dtype=np.float32))
+            parts.append(audio.audio_data)
+            prev_punct = end_punct
+
+    full = np.concatenate(parts) if parts else np.zeros(0, dtype=np.float32)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     sf.write(str(out), full, sr)
