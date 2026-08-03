@@ -65,8 +65,9 @@ Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多�
 |---|---|---|
 | `models/gpt_firefly_678orig-e15.ckpt` | ~150MB | s1 GPT（文本→语义 token），v2 中文 |
 | `models/sovits_firefly_678orig_e10.pth` | ~165MB | s2 SoVITS（语义→音频），v2 中文，与成功 torch 基准逐字节一致 |
-| `models/gpt_firefly_v3-e15.ckpt` | ~150MB | s1 GPT，**v3 多语言**（中/英/日/混合） |
-| `models/sovits_firefly_v3_e10.pth` | ~165MB | s2 SoVITS，**v3 多语言** |
+| `models/gpt_firefly_v3-e15.ckpt` | ~150MB | s1 GPT，**v3 多语言**（e15，发音相对更清晰） |
+| `models/gpt_firefly_v3-e45.ckpt` | ~150MB | s1 GPT，**v3 多语言**（续训到 e45，acc↑ 但发音更糊，待排查） |
+| `models/sovits_firefly_v3_e10.pth` | ~165MB | s2 SoVITS，**v3 多语言**（未续训） |
 | `models/genie/firefly_678orig/` | ~321MB | ~~旧 genie ONNX 产物~~（已弃用，保留参考） |
 
 > 模型文件与 `runs/Airi_678orig_v2ProPlus_v2`（WSL torch 推理基准）所用权重**逐字节一致**（1MB 头哈希已核对）。
@@ -187,6 +188,7 @@ python tools/tts_server.py        # 首次自动下载预训练模型到 gsv_mod
 - [x] 流式 TTS 服务 `tools/tts_server.py`：`/api/tts` 流式 + `/demo` 试听 + `--bench`/`--compare`
 - [x] 参考音频修正：撒娇甜（蛋糕卷桥段）、生气（7.09s 171）
 - [x] **v3 多语言**：翻译 + CosyVoice3 克隆生成 480 条多语言数据 → 训练 `firefly_v3`（中/英/日/混合）→ demo 验证
+- [ ] ⚠️ **v3 中文发音模糊（待排查）**：s1 e15→e45 续训后更糊（acc↑ 反而更差），疑 s2 未续训/过拟合/多语言数据稀释。日志在 `docs/v3_training_logs/`，排查说明见其 README
 - [ ] AiriLife 端对接（流式消费 / QQ 语音）
 - [ ] v3 换用英语/日语参考音频优化英日音色
 

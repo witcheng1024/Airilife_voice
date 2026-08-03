@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = ROOT / "gsv_models"
-GPT = ROOT / "models" / "gpt_firefly_v3-e15.ckpt"
+GPT = ROOT / "models" / "gpt_firefly_v3-e45.ckpt"
 SOV = ROOT / "models" / "sovits_firefly_v3_e10.pth"
 REF = ROOT / "reference_audio" / "活泼.wav"
 REF_TXT = "好啦！看上去真不错，你好上相呀。"
