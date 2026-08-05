@@ -223,3 +223,31 @@ python tools/tts_server.py        # 首次自动下载预训练模型到 gsv_mod
 ├── output/                # 推理输出（bench/compare/stream，gitignore）
 └── .gitattributes         # LFS 规则
 ```
+
+---
+
+## 后续优化 TODO
+
+### 1. 启用音色/风格解耦（spk ≠ prompt）
+
+当前 `tools/tts_server.py` 里 `spk_audio_path=ref, prompt_audio_path=ref` 俩填同一个文件，等于退化回"一个参考音频"，没用上 GSV-TTS-Lite 的音色/风格解耦。
+
+**优化方向**：把 `prompt_audio` 换成另一段（更夸张的情绪样本，甚至不同声线的情绪录音），`spk` 保持流萤 → 流萤声线 + 那段情绪。
+- `cache_spk_audio` / `cache_prompt_audio` 已分开缓存，只需在 `EMO` 表里给每个情绪拆出独立的 `(spk_file, spk_text)` 和 `(prompt_file, prompt_text)`。
+- **用途**：流萤原声里某情绪样本不够好时（README 提到撒娇甜换过 3 次才定、生气踩过 <3s 坑），可以借别人的高质量情绪录音套流萤声线，**扩情绪表现力而不用重训**。
+- 注意：`prompt_text` 必须与 `prompt_audio` 内容一致（曾踩坑）。
+
+### 2. 排查混合语言（中英日）丢字/跳过
+
+重训 s1/s2 后，混合语言文本（如包含日语的句子）会跳过日语段。需区分是 **g2p/文本前端** 问题还是 **GPT (s1)** 问题：
+
+- **先查 g2p**：用 `text_language="auto"` 时，短 JP 段可能被误判为 CN → 错误音素 → 模型"跳过"。给 `tts_server.py` 加一个调试入口，打印 g2p 对混合文本产出的音素序列，确认 JP 段是否被正确转写。
+- **GPT 丢字是已知问题**：官方 changelog 明确 V2Pro/V3"GPT 合成更稳定，重复漏字更少"；PR#457（2024.02）加 DPO 损失训练选项"通过构造负样本训练缓解 GPT 重复漏字问题"。我们用的是 V2ProPlus（较稳），若 g2p 输出正确仍丢字，考虑：开 DPO 训练、确保训练集含足够混合语言样本、s1 epoch 不要过低（欠训→注意力不稳→丢字）。
+- 短期 workaround：对混合文本按语种切分，分段合成再拼接，避免 auto-detect 在短段上误判。
+
+### 3. 性能杠杆（未拉）
+
+- `TTS(use_flash_attn=True)`：装 Windows 预编译 wheel（[lldacing/flash-attention-windows-wheel](https://huggingface.co/lldacing/flash-attention-windows-wheel)），TTFT 150→133ms、RTF 0.125→0.108、显存再降。RTX 4070 支持。
+- `gpt_cache=[(1, 64), (1, 128)]`：CUDA Graph 静态缓存，省每次推理的 graph 编译开销，稳态 TTFT 再降。
+- `sovits_cache` 调参（流式示例 `[50, 55]` = stream_chunk×2 + overlap）。
+
