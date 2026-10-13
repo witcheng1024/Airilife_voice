@@ -27,13 +27,25 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import gc
+import html
+import json
 import logging
 import os
+import threading
 import time
 import wave
+from contextlib import aclosing, closing
 from pathlib import Path
 
 import numpy as np
+import torch
+from anyio import CancelScope
+
+if __package__:
+    from .voice_registry import is_ready, load_speakers, public_speakers
+else:
+    from voice_registry import is_ready, load_speakers, public_speakers
 
 ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = ROOT / "gsv_models"
@@ -74,22 +86,78 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("airi_tts")
 
 tts: "TTS | None" = None
+_active_speaker = None
+_speaker_lock = asyncio.Lock()
+
+
+def _speakers():
+    return load_speakers(ROOT, GPT, SOV, EMO)
+
+
+def _load_speaker(speaker):
+    global tts, _active_speaker
+    signature = (speaker['id'], str(speaker['gpt']), str(speaker['sovits']),
+                 speaker['gpt'].stat().st_mtime_ns, speaker['sovits'].stat().st_mtime_ns,
+                 tuple((emotion, str(reference['audio']), reference['text'],
+                        reference.get('language', 'zh'), reference['audio'].stat().st_mtime_ns)
+                       for emotion, reference in sorted(speaker['references'].items())))
+    if tts is not None and _active_speaker is not None and _active_speaker['signature'] == signature:
+        return
+    tts = None
+    _active_speaker = None
+    gc.collect()
+    torch.cuda.empty_cache()
+    engine = TTS(models_dir=str(MODELS_DIR), use_bert=True)
+    engine.load_gpt_model(str(speaker['gpt']))
+    engine.load_sovits_model(str(speaker['sovits']))
+    for reference in speaker['references'].values():
+        audio = str(reference['audio'])
+        if not reference['audio'].is_file():
+            logger.error('缺参考音频: %s', audio)
+            continue
+        engine.cache_spk_audio(audio)
+        engine.cache_prompt_audio(prompt_audio_paths=audio, prompt_audio_texts=reference['text'],
+                                 prompt_language=reference.get('language', 'zh'))
+    tts = engine
+    _active_speaker = dict(speaker, signature=signature)
+    logger.info('音色就绪: %s (%s + %s)', speaker['id'], speaker['gpt'].name, speaker['sovits'].name)
 
 
 def _init() -> None:
-    """加载 GSV 引擎 + firefly 模型 + 预缓存全部情绪参考（请求 TTFT 走稳态 ~450ms）。"""
-    global tts
-    tts = TTS(models_dir=str(MODELS_DIR), use_bert=True)
-    tts.load_gpt_model(str(GPT))
-    tts.load_sovits_model(str(SOV))
-    for emo, (fn, txt, _, _) in EMO.items():
-        ref = str(REF_DIR / fn)
-        if not os.path.exists(ref):
-            logger.error(f"缺参考音频: {ref}")
-            continue
-        tts.cache_spk_audio(ref)
-        tts.cache_prompt_audio(prompt_audio_paths=ref, prompt_audio_texts=txt, prompt_language="zh")
-    logger.info(f"引擎就绪: {GPT.name} + {SOV.name}（use_bert），{len(EMO)} 个情绪参考已缓存")
+    _load_speaker(_speakers()['firefly'])
+
+
+async def _engine_stream(engine, **arguments):
+    loop = asyncio.get_running_loop()
+    queue = asyncio.Queue()
+    stopped = threading.Event()
+
+    def worker():
+        try:
+            with engine._infer_lock:
+                with closing(engine.infer_stream(**arguments)) as audio_stream:
+                    for audio in audio_stream:
+                        if stopped.is_set():
+                            break
+                        loop.call_soon_threadsafe(queue.put_nowait, audio)
+        except BaseException as error:
+            loop.call_soon_threadsafe(queue.put_nowait, error)
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    future = loop.run_in_executor(None, worker)
+    try:
+        while True:
+            audio = await queue.get()
+            if audio is None:
+                break
+            if isinstance(audio, BaseException):
+                raise audio
+            yield audio
+    finally:
+        stopped.set()
+        with CancelScope(shield=True):
+            await asyncio.shield(future)
 
 
 def _to_pcm(audio) -> bytes:
@@ -111,26 +179,32 @@ _STREAM_KW = dict(
 )
 
 
-async def _stream(text: str, ref: str, ref_txt: str, stream_mode: str = "token"):
+async def _stream(text: str, ref: str, ref_txt: str, stream_mode: str = "token",
+                  text_language: str | None = None, prompt_language: str | None = None):
     """逐块推流原始 int16 PCM。infer_stream_async 内部已用 _infer_lock 串行化。
 
     token 模式：首字延迟最低（~120ms），供后端实时播放；
     sentence 模式：句子级块，听感更稳（无 boost 首字重复），供 demo/试听。
     """
     kw = dict(_STREAM_KW)
+    if text_language is not None:
+        kw['text_language'] = text_language
+    if prompt_language is not None:
+        kw['prompt_language'] = prompt_language
     kw["stream_mode"] = stream_mode
     if stream_mode == "sentence":
         kw["boost_first_chunk"] = False
     t0 = time.perf_counter()
     emitted = 0
-    async for audio in tts.infer_stream_async(
+    async with aclosing(_engine_stream(tts,
         spk_audio_path=ref, prompt_audio_path=ref, prompt_audio_text=ref_txt,
         text=text, **kw,
-    ):
-        if emitted == 0:
-            logger.info(f"[TTFT] 首块 {(time.perf_counter() - t0) * 1000:.0f} ms")
-        emitted += len(audio.audio_data)
-        yield _to_pcm(audio)
+    )) as audio_stream:
+        async for audio in audio_stream:
+            if emitted == 0:
+                logger.info(f"[TTFT] 首块 {(time.perf_counter() - t0) * 1000:.0f} ms")
+            emitted += len(audio.audio_data)
+            yield _to_pcm(audio)
     logger.info(f"[DONE] 共 {emitted / SR:.2f}s 音频")
 
 
@@ -183,9 +257,19 @@ async def compare(emotions: list[str]) -> None:
 
 from fastapi import FastAPI, HTTPException  # noqa: E402
 from fastapi.responses import HTMLResponse, StreamingResponse  # noqa: E402
+from starlette.background import BackgroundTask
 from pydantic import BaseModel  # noqa: E402
 
 app = FastAPI(title="AiriLife v2 TTS (GSV)")
+
+
+class _ClosingStreamingResponse(StreamingResponse):
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            if self.background is not None:
+                await self.background()
 
 
 class TTSRequest(BaseModel):
@@ -202,24 +286,75 @@ async def _startup() -> None:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "engine": "gsv-tts-lite",
-            "model": f"{GPT.stem} + {SOV.stem}",
-            "device": "gpu", "emotions": list(EMO)}
+    speaker = _active_speaker or _speakers()['firefly']
+    return {"ok": tts is not None and _active_speaker is not None, "engine": "gsv-tts-lite",
+            "model": f"{speaker['gpt'].stem} + {speaker['sovits'].stem}",
+            "device": "gpu", "emotions": list(speaker['references']),
+            "speaker": speaker['id'], "voices": public_speakers(_speakers())}
+
+
+@app.get('/api/voices')
+@app.get('/api/speakers')
+async def voices() -> dict:
+    return {'default': 'firefly', 'voices': public_speakers(_speakers())}
 
 
 @app.post("/api/tts")
 async def tts_endpoint(req: TTSRequest) -> StreamingResponse:
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="text 不能为空")
-    if req.emotion not in EMO:
-        raise HTTPException(status_code=400, detail=f"未知情绪: {req.emotion}，可选 {'/'.join(EMO)}")
+    speakers = _speakers()
+    if req.speaker not in speakers:
+        raise HTTPException(status_code=400, detail=f'未知音色: {req.speaker}')
+    speaker = speakers[req.speaker]
+    if not is_ready(speaker):
+        raise HTTPException(status_code=503, detail=f'音色尚未就绪: {req.speaker}')
+    if req.emotion not in speaker['references']:
+        available = '/'.join(speaker['references'])
+        raise HTTPException(status_code=400, detail=f'未知情绪: {req.emotion}，可选 {available}')
     if req.stream_mode not in ("token", "sentence"):
         raise HTTPException(status_code=400, detail="stream_mode 只能为 token 或 sentence")
-    ref = str(REF_DIR / EMO[req.emotion][0])
+    reference = speaker['references'][req.emotion]
+    ref = str(reference['audio'])
     if not os.path.exists(ref):
         raise HTTPException(status_code=500, detail=f"缺参考音频: {ref}")
-    return StreamingResponse(_stream(req.text, ref, EMO[req.emotion][1], req.stream_mode),
-                             media_type="audio/L16; rate=32000; channels=1")
+    await _speaker_lock.acquire()
+    try:
+        _load_speaker(speaker)
+    except Exception as error:
+        _speaker_lock.release()
+        logger.exception('音色加载失败: %s', req.speaker)
+        raise HTTPException(status_code=503, detail=f'音色加载失败: {req.speaker}') from error
+    except BaseException:
+        _speaker_lock.release()
+        raise
+    released = False
+
+    async def release():
+        nonlocal released
+        if not released:
+            released = True
+            _speaker_lock.release()
+
+    async def stream():
+        try:
+            async with aclosing(_stream(req.text, ref, reference['text'], req.stream_mode,
+                                        speaker.get('text_language', 'zh'), reference.get('language', 'zh'))) as chunks:
+                async for chunk in chunks:
+                    yield chunk
+        finally:
+            await release()
+
+    response_stream = stream()
+
+    async def cleanup():
+        try:
+            await response_stream.aclose()
+        finally:
+            await release()
+
+    return _ClosingStreamingResponse(response_stream, media_type="audio/L16; rate=32000; channels=1",
+                                     headers={'X-TTS-Speaker': speaker['id']}, background=BackgroundTask(cleanup))
 
 
 _DEMO_HTML = """<!DOCTYPE html>
@@ -240,11 +375,23 @@ b{color:#7f7}
 <h2>AiriLife v2 流式 TTS 试听 <small>(GSV-TTS-Lite / GPU)</small></h2>
 <p>点「生成并播放」：浏览器实时接收流式 PCM 并播放。首块约 100-500ms 出声，之后连续播放 —— 耳朵验证流式。</p>
 <textarea id="text" rows="2">你好呀！今天过得怎么样？我们出去走走吧！</textarea>
+<label for="speaker">音色</label><select id="speaker">{SPEAKER_OPTIONS}</select>
 <select id="emotion">{EMOTION_OPTIONS}</select>
 <button id="btn">生成并播放</button>
 <div id="status"></div>
 <script>
 const $ = s => document.querySelector(s);
+const speakerInfos = {SPEAKER_METADATA};
+$('#speaker').onchange = () => {
+  const speaker = speakerInfos.find(item => item.id === $('#speaker').value);
+  $('#emotion').replaceChildren();
+  for (const emotion of speaker.emotions) {
+    const option = document.createElement('option');
+    option.value = emotion;
+    option.textContent = emotion;
+    $('#emotion').appendChild(option);
+  }
+};
 let ctx = null;
 const log = m => { $('#status').textContent += m + '\\n'; };
 
@@ -262,7 +409,7 @@ async function play() {
   const resp = await fetch('/api/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, emotion, stream_mode: 'sentence' }),  // 试听用句子级，听感更稳
+    body: JSON.stringify({ text, emotion, speaker: $('#speaker').value, stream_mode: 'sentence' }),
   });
   if (!resp.ok) { log('HTTP ' + resp.status + ' ' + await resp.text()); return; }
 
@@ -311,7 +458,14 @@ $('#btn').onclick = play;
 @app.get("/demo", response_class=HTMLResponse)
 async def demo_page() -> str:
     opts = "".join(f'<option value="{e}">{e}</option>' for e in EMO)
-    return _DEMO_HTML.replace("{EMOTION_OPTIONS}", opts)
+    speakers = public_speakers(_speakers())
+    speaker_options = ''.join(
+        '<option value="{}" {}>{}</option>'.format(html.escape(speaker['id'], quote=True),
+            '' if speaker['ready'] else 'disabled', html.escape(speaker['label']))
+        for speaker in speakers)
+    metadata = json.dumps(speakers, ensure_ascii=False).replace('<', r'\u003c')
+    return (_DEMO_HTML.replace("{EMOTION_OPTIONS}", opts)
+            .replace('{SPEAKER_OPTIONS}', speaker_options).replace('{SPEAKER_METADATA}', metadata))
 
 
 def main() -> None:
