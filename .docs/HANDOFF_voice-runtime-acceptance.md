@@ -45,6 +45,8 @@ GSV-TTS-Lite 0.4.7 的参考 prompt 依赖 SoVITS 权重，不能在两个权重
 
 本机 Windows 推理使用 `D:/miniforge3/envs/gsv/python.exe` [win]，GSV-TTS-Lite 0.4.7。Git 元数据属于 Ubuntu24.04 WSL，使用该仓库现有 WSL Git；Windows Python仍在Windows执行。
 
+提交 `bf32e8a` 已推送 `origin/feat/voice-runtime-acceptance`，远端tip核对一致。WSL HTTPS push卡住约两分钟，只结束已确认的本次git push PID302，随后Windows Git通过显式 `--git-dir=E:/PROJECT/Airilife_voice/.git/worktrees/voice-runtime-acceptance` 和 `--work-tree=E:/PROJECT/Airilife_voice/.claude/worktrees/voice-runtime-acceptance` 使用本机可用网络推送；不改.git指针、系统代理或WSL配置。后续本机网络操作可沿用该入口。
+
 ## 9. 运行副作用
 
 独立 worktree 位于 `E:/PROJECT/Airilife_voice/.claude/worktrees/voice-runtime-acceptance` [win]，LFS smudge 已跳过，目录内权重是指针，不能直接作为推理权重。后续验收必须显式读取原语音工作区的真实资源，不能误用指针文件。
