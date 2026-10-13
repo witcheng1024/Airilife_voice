@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import gc
 import html
 import json
 import logging
@@ -47,7 +46,7 @@ if __package__:
 else:
     from voice_registry import is_ready, load_speakers, public_speakers
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(os.environ.get('AIRILIFE_VOICE_RESOURCE_ROOT', Path(__file__).resolve().parent.parent)).resolve()
 MODELS_DIR = ROOT / "gsv_models"
 # 模型可选：默认 v2 中文；设环境变量 GSV_GPT/GSV_SOV 切 v3 多语言（如 firefly_v3）
 GPT = Path(os.environ.get("GSV_GPT", ROOT / "models" / "gpt_firefly_678orig-e15.ckpt"))
@@ -81,12 +80,16 @@ EMO = {
 BENCH_TEXT = "你好呀！今天过得怎么样？"
 
 from gsv_tts import TTS  # noqa: E402
+from gsv_tts.GPT_SoVITS.G2P import text_to_phonemes  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("airi_tts")
 
 tts: "TTS | None" = None
 _active_speaker = None
+_loaded_models = None
+_reference_signatures = {}
+_loading_speaker = None
 _speaker_lock = asyncio.Lock()
 
 
@@ -94,37 +97,72 @@ def _speakers():
     return load_speakers(ROOT, GPT, SOV, EMO)
 
 
-def _load_speaker(speaker):
-    global tts, _active_speaker
-    signature = (speaker['id'], str(speaker['gpt']), str(speaker['sovits']),
-                 speaker['gpt'].stat().st_mtime_ns, speaker['sovits'].stat().st_mtime_ns,
-                 tuple((emotion, str(reference['audio']), reference['text'],
-                        reference.get('language', 'zh'), reference['audio'].stat().st_mtime_ns)
-                       for emotion, reference in sorted(speaker['references'].items())))
-    if tts is not None and _active_speaker is not None and _active_speaker['signature'] == signature:
-        return
-    tts = None
-    _active_speaker = None
-    gc.collect()
-    torch.cuda.empty_cache()
-    engine = TTS(models_dir=str(MODELS_DIR), use_bert=True)
-    engine.load_gpt_model(str(speaker['gpt']))
-    engine.load_sovits_model(str(speaker['sovits']))
-    for reference in speaker['references'].values():
+def _load_speaker(speaker, reference):
+    """Keep common models, one voice pair and references for that pair.
+
+    GSV prompt semantics depend on SoVITS weights. Clear those caches when
+    changing weights; the native prompt cache is only keyed by audio path.
+    """
+    global tts, _active_speaker, _loaded_models
+    signature = (str(speaker['gpt']), speaker['gpt'].stat().st_mtime_ns,
+                 str(speaker['sovits']), speaker['sovits'].stat().st_mtime_ns)
+    if tts is None:
+        tts = TTS(models_dir=str(MODELS_DIR), use_bert=True,
+                  always_load_cnhubert=True, always_load_sv=True)
+    engine = tts
+    with engine._infer_lock:
+        if _loaded_models != signature:
+            _active_speaker = None
+            _loaded_models = None
+            engine.unload_gpt_model(*engine.get_gpt_list())
+            engine.unload_sovits_model(*engine.get_sovits_list())
+            engine.del_spk_audio(*engine.get_spk_audio_list())
+            engine.del_prompt_audio(*engine.get_prompt_audio_list())
+            _reference_signatures.clear()
+            engine.load_gpt_model(str(speaker['gpt']))
+            engine.load_sovits_model(str(speaker['sovits']))
+            _loaded_models = signature
         audio = str(reference['audio'])
-        if not reference['audio'].is_file():
-            logger.error('缺参考音频: %s', audio)
-            continue
-        engine.cache_spk_audio(audio)
-        engine.cache_prompt_audio(prompt_audio_paths=audio, prompt_audio_texts=reference['text'],
-                                 prompt_language=reference.get('language', 'zh'))
-    tts = engine
-    _active_speaker = dict(speaker, signature=signature)
+        ref_signature = (reference['audio'].stat().st_mtime_ns, reference['text'],
+                         reference.get('language', 'zh'))
+        if _reference_signatures.get(audio) != ref_signature:
+            engine.del_spk_audio(audio)
+            engine.del_prompt_audio(audio)
+            engine.cache_spk_audio(audio, sovits_model=str(speaker['sovits']))
+            engine.cache_prompt_audio(prompt_audio_paths=audio, prompt_audio_texts=reference['text'],
+                                     prompt_language=reference.get('language', 'zh'))
+            _reference_signatures[audio] = ref_signature
+        _active_speaker = dict(speaker, signature=signature)
     logger.info('音色就绪: %s (%s + %s)', speaker['id'], speaker['gpt'].name, speaker['sovits'].name)
 
 
 def _init() -> None:
-    _load_speaker(_speakers()['firefly'])
+    speaker = _speakers()['firefly']
+    _load_speaker(speaker, speaker['references']['平淡'])
+    # Chinese references already initialize Chinese G2P. English names in
+    # ordinary Chinese replies otherwise initialize the English dictionaries
+    # on the first audio request. Warm that frontend before reporting ready.
+    started = time.perf_counter()
+    text_to_phonemes('Hello.', 'en')
+    logger.info('英文文本前端就绪: %.0f ms', (time.perf_counter() - started) * 1000)
+
+
+async def _await_worker(future):
+    """Cancellation waits for the native worker before model locks may release."""
+    try:
+        return await asyncio.shield(future)
+    except asyncio.CancelledError:
+        with CancelScope(shield=True):
+            while not future.done():
+                try:
+                    await asyncio.shield(future)
+                except asyncio.CancelledError:
+                    continue
+                except Exception:
+                    break
+            if not future.cancelled() and (error := future.exception()) is not None:
+                logger.error('取消期间后台语音任务失败', exc_info=(type(error), error, error.__traceback__))
+        raise
 
 
 async def _engine_stream(engine, **arguments):
@@ -157,7 +195,7 @@ async def _engine_stream(engine, **arguments):
     finally:
         stopped.set()
         with CancelScope(shield=True):
-            await asyncio.shield(future)
+            await _await_worker(future)
 
 
 def _to_pcm(audio) -> bytes:
@@ -180,7 +218,8 @@ _STREAM_KW = dict(
 
 
 async def _stream(text: str, ref: str, ref_txt: str, stream_mode: str = "token",
-                  text_language: str | None = None, prompt_language: str | None = None):
+                  text_language: str | None = None, prompt_language: str | None = None,
+                  *, gpt_model: str | None = None, sovits_model: str | None = None):
     """逐块推流原始 int16 PCM。infer_stream_async 内部已用 _infer_lock 串行化。
 
     token 模式：首字延迟最低（~120ms），供后端实时播放；
@@ -198,7 +237,7 @@ async def _stream(text: str, ref: str, ref_txt: str, stream_mode: str = "token",
     emitted = 0
     async with aclosing(_engine_stream(tts,
         spk_audio_path=ref, prompt_audio_path=ref, prompt_audio_text=ref_txt,
-        text=text, **kw,
+        text=text, gpt_model=gpt_model, sovits_model=sovits_model, **kw,
     )) as audio_stream:
         async for audio in audio_stream:
             if emitted == 0:
@@ -287,10 +326,16 @@ async def _startup() -> None:
 @app.get("/health")
 async def health() -> dict:
     speaker = _active_speaker or _speakers()['firefly']
-    return {"ok": tts is not None and _active_speaker is not None, "engine": "gsv-tts-lite",
+    ready = tts is not None and _active_speaker is not None and _loading_speaker is None
+    return {"ok": ready, "engine": "gsv-tts-lite",
             "model": f"{speaker['gpt'].stem} + {speaker['sovits'].stem}",
             "device": "gpu", "emotions": list(speaker['references']),
-            "speaker": speaker['id'], "voices": public_speakers(_speakers())}
+            "speaker": speaker['id'], "voices": public_speakers(_speakers()),
+            "status": 'ready' if ready else 'loading' if _loading_speaker else 'unavailable',
+            "loadingSpeaker": _loading_speaker,
+            "residentVoiceModels": 0 if _loaded_models is None else 1,
+            "gpuAllocatedMiB": round(torch.cuda.memory_allocated() / 1048576, 1),
+            "gpuReservedMiB": round(torch.cuda.memory_reserved() / 1048576, 1)}
 
 
 @app.get('/api/voices')
@@ -301,6 +346,7 @@ async def voices() -> dict:
 
 @app.post("/api/tts")
 async def tts_endpoint(req: TTSRequest) -> StreamingResponse:
+    global _loading_speaker
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="text 不能为空")
     speakers = _speakers()
@@ -319,8 +365,11 @@ async def tts_endpoint(req: TTSRequest) -> StreamingResponse:
     if not os.path.exists(ref):
         raise HTTPException(status_code=500, detail=f"缺参考音频: {ref}")
     await _speaker_lock.acquire()
+    prepare_start = time.perf_counter()
+    _loading_speaker = req.speaker
     try:
-        _load_speaker(speaker)
+        future = asyncio.get_running_loop().run_in_executor(None, _load_speaker, speaker, reference)
+        await _await_worker(future)
     except Exception as error:
         _speaker_lock.release()
         logger.exception('音色加载失败: %s', req.speaker)
@@ -328,6 +377,9 @@ async def tts_endpoint(req: TTSRequest) -> StreamingResponse:
     except BaseException:
         _speaker_lock.release()
         raise
+    finally:
+        _loading_speaker = None
+    prepare_ms = (time.perf_counter() - prepare_start) * 1000
     released = False
 
     async def release():
@@ -339,7 +391,8 @@ async def tts_endpoint(req: TTSRequest) -> StreamingResponse:
     async def stream():
         try:
             async with aclosing(_stream(req.text, ref, reference['text'], req.stream_mode,
-                                        speaker.get('text_language', 'zh'), reference.get('language', 'zh'))) as chunks:
+                                        speaker.get('text_language', 'zh'), reference.get('language', 'zh'),
+                                        gpt_model=str(speaker['gpt']), sovits_model=str(speaker['sovits']))) as chunks:
                 async for chunk in chunks:
                     yield chunk
         finally:
@@ -354,7 +407,8 @@ async def tts_endpoint(req: TTSRequest) -> StreamingResponse:
             await release()
 
     return _ClosingStreamingResponse(response_stream, media_type="audio/L16; rate=32000; channels=1",
-                                     headers={'X-TTS-Speaker': speaker['id']}, background=BackgroundTask(cleanup))
+                                     headers={'X-TTS-Speaker': speaker['id'], 'X-TTS-Prepare-Ms': f'{prepare_ms:.1f}'},
+                                     background=BackgroundTask(cleanup))
 
 
 _DEMO_HTML = """<!DOCTYPE html>
