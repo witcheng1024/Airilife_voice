@@ -1,10 +1,23 @@
-# AiriLife 流萤语音 v2 — GPT-SoVITS v2ProPlus + GSV-TTS-Lite
+# AiriLife 本地语音 v2 — 流萤 / 梓涵 · GPT-SoVITS v2ProPlus
 
-Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多情绪表达**的本地 TTS，满足桌宠实时性要求。
+AiriLife 桌宠的本地 TTS 方案：GPT-SoVITS v2ProPlus 训练、GSV-TTS-Lite 推理，支持流萤及梓涵（新海天中文）音色与多情绪表达。训练在 WSL2，当前推理在 Windows / RTX 4070 Laptop。
 
-> 本分支（`v2`）是 GPT-SoVITS 方案。旧 CosyVoice3 方案在 `master` 分支，已弃用。
+> 本分支（`v2`）记录 GPT-SoVITS 方案。`master` 是旧 CosyVoice3 部署方案；CosyVoice3 仍用于部分教师数据生成。
 >
 > 训练在 WSL2，**推理/部署在 Windows**（GPU：RTX 4070 Laptop）。
+
+新海天中文独立训练与双音色切换：见 [流程与状态说明](docs/zihan_cn_training.md)。默认流萤不变，新音色通过 `speaker=zihan` 选择。
+
+## 当前状态（2026-10-15）
+
+| 范围 | 状态与入口 |
+|---|---|
+| 当前本机服务 | 已接入 AiriLife 的模型→TTS→Gateway 流式播放链路；本次按用户要求停止，`9880` 已释放 |
+| 已发布运行优化代码 | [`feat/voice-runtime-acceptance`](https://github.com/witcheng1024/Airilife_voice/tree/feat/voice-runtime-acceptance)，包括双音色注册、共享引擎、串行切换、取消释放和 G2P 预热；[交接与验证范围](https://github.com/witcheng1024/Airilife_voice/blob/feat/voice-runtime-acceptance/.docs/HANDOFF_voice-runtime-acceptance.md) |
+| `v2` 与本机工作区 | 本机 `tools/tts_server.py` 已应用上述运行优化；本次只发布文档，**没有将运行优化分支合入 `v2`**。仅 checkout 远端 `v2` 不会得到当前完整双音色服务 |
+| 梓涵训练 | 本机自动训练/验证完成，选择 `s1e5_s2e10`，固定测试 10/10 通过、平均 CER 约 0.0095；最终主观听音仍为 `pending` |
+| 模型与训练资产 | 梓涵模型、参考音频、训练脚本及新增 v3 权重仍有本机未跟踪文件，本次文档提交不包含它们；不能把本机可运行等同于远端可完整复现 |
+| 另一台电脑部署 | GTX 1650 / 2GB VRAM / 16GB RAM + Tailscale 尚未部署验证；当前测得常驻约 1.86GB VRAM、2.75GB RAM，2GB 卡不宜按现配置直接认定可用 |
 
 ---
 
@@ -12,12 +25,12 @@ Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多�
 
 | 环节 | 方案 | 说明 |
 |---|---|---|
-| 训练 | GPT-SoVITS **v2ProPlus** | 678 条原声训练，s1=e15 / s2=e10 |
-| 推理引擎 | **GSV-TTS-Lite 0.4.7** | 纯 PyTorch GPU 推理（CUDA Graph / Nested KV Cache / fp16），**质量 = 官方 torch** |
+| 训练 | GPT-SoVITS **v2ProPlus** | 流萤中文 / 多语言训练；梓涵独立中文教师数据 + 日文 anchor 训练 |
+| 推理引擎 | **GSV-TTS-Lite 0.4.7** | PyTorch GPU 推理（CUDA Graph / KV Cache / fp16）；音色与自然度需试听验收 |
 | ~~genie-tts~~ | ~~ONNX 引擎~~ | ~~已弃用：ONNX 有音色退化 + 尾字截断（genie issue #31）~~ |
 | 声线方案 | 原声数据训练 + 参考音频带情绪/年龄感 | EQ/asetrate 变调无效，年轻感靠推理时换参考 |
 
-**为什么弃 genie-tts 换 GSV-TTS-Lite**：genie 走 ONNX 转换，v2ProPlus 中文在断句/语调/音色上有系统性退化（尾字截断、音色不到位），且是上游 open issue。GSV-TTS-Lite 不转 ONNX、不改权重，只优化执行方式（CUDA Graph/KV Cache/fp16/batching），**质量与官方 PyTorch 一致**，速度 3~4x、显存减半。
+**为什么弃 genie-tts 换 GSV-TTS-Lite**：早期 ONNX 路线出现尾字截断、语调和音色退化。GSV-TTS-Lite 使用 PyTorch 权重并优化执行方式，避免该转换路径。早期速度对比不作为当前端到端延迟承诺，实际结果见下方实测范围。
 
 ---
 
@@ -59,7 +72,7 @@ Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多�
 
 ---
 
-## 四、模型文件（Git LFS）
+## 四、模型文件与分发范围
 
 | 文件 | 大小 | 说明 |
 |---|---|---|
@@ -67,32 +80,34 @@ Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多�
 | `models/sovits_firefly_678orig_e10.pth` | ~165MB | s2 SoVITS（语义→音频），v2 中文 |
 | `models/gpt_firefly_v3-e15.ckpt` | ~150MB | s1 GPT，**v3 多语言** e15（发音较清晰，备选） |
 | `models/gpt_firefly_v3-e20.ckpt` | ~150MB | s1 GPT，**v3 多语言** e20（**定版**） |
-| `models/sovits_firefly_v3_e{30,35,40,45,50}_cont.pth` | 各~165MB | s2 SoVITS，**v3 多语言** e30-e50（**e40 定版**，s2 越大越好） |
+| `models/sovits_firefly_v3_e{30,35,40,45,50}_cont.pth` | 各~165MB | s2 SoVITS，**v3 多语言** e30-e50（本地选用 **e40**） |
 | `models/genie/firefly_678orig/` | ~321MB | ~~旧 genie ONNX 产物~~（已弃用，保留参考） |
 
-> 定版组合：**s1e20_s2e40 + text_language=zh**。v3 网格排查结论：s1≈15-20 最优（>20 过拟合），s2 越大越好（e50 未过拟合）。
+> 流萤 v3 的本地选定组合为 **s1e20_s2e40 + text_language=zh**。这是该次网格比较的选择，不意味着 epoch 越大普遍越好。`tts_server.py` 未配置 `GSV_GPT/GSV_SOV` 时仍默认 v2 中文 `e15/e10`；以环境变量和 `/health` 实际模型路径为准。
 
-> 模型文件与 `runs/Airi_678orig_v2ProPlus_v2`（WSL torch 推理基准）所用权重**逐字节一致**（1MB 头哈希已核对）。
+> 表中包含本机资产清单，并非全部已发布到 Git LFS。新增 v3 权重、`models/zihan/`、`reference_audio/zihan/` 当前仍有未跟踪文件。早期只核对过部分文件头哈希，不能据此声称整个权重文件逐字节一致。
 
 ---
 
-## 五、推理与实时性（实测数据表）
+## 五、推理与实时性（分清测量边界）
 
-实测环境：**Windows / RTX 4070 Laptop GPU / torch 2.11.0+cu128 / gsv-tts-lite 0.4.7 / 参考音频预缓存**
+当前实测环境：**Windows / RTX 4070 Laptop / GSV-TTS-Lite 0.4.7**。以下数据来自不同请求与测量层，不宜混作同一种“首字时间”。
 
-| 指标 | 实测值 | 说明 |
+| 范围 | 实测值 | 边界 |
 |---|---|---|
-| **首字延迟（TTFT）** | **~120 ms**（warm HTTP 首音频字节） | token 级流式，比 genie ONNX(1.2~2.4s) 快一个数量级 |
-| TTFT（冷启动/首次） | 417–494 ms | bench 8 情绪均值 ~466ms |
-| 实时率 RTF | ~0.1 | GPU fp16，合成 3.6s 音频仅需 ~0.5s |
-| 流式粒度 | **token 级** | `stream_mode="token"`，25 token 一触发 vits |
-| 显存占用 | <1GB | Nested KV Cache + fp16 |
+| 早期单音色基准 | warm HTTP 首音频字节约 120ms；首次 417–494ms，RTF 约 0.1 | 历史基准，不代表冷切音色或完整应用 |
+| 运行优化后的短句 HTTP 冷切 | 3.151s / 2.781s；此前 21.028s / 16.171s | 到首 PCM；公共引擎复用，一次常驻一套角色权重 |
+| AiriLife 实际包完整链路 | 梓涵冷切 52 字 5.509s；流萤冷切 48 字 4.770s；流萤热 64 字 2.366s | 模型请求至 Gateway 首非零 PCM，非扬声器首声 |
+| 完整服务启动 | 23.423s | 含公共模型与英文 G2P 预热，连续健康轮询测得 |
+| 切换期间健康检查 | 102 次采样、65 次 loading，零超时、最大 181ms | 健康检查可响应不等于音色已加载完毕 |
+| 资源快照 | Torch allocated 1501.9MiB / reserved 1694.0MiB；另一次进程观测约 1.86GB VRAM / 2.75GB RAM | 一套角色权重；不同工具口径不相加，不代表推理峰值 |
 
-**对比 genie-tts（已弃用）**：TTFT 1.2–2.4s（尾字被截断，音色/语调退化，open issue #31 未修）。
+完整证据见运行优化分支交接。尚未证明所有请求恒定 1–2 秒；HTTP 首字节、非零 PCM、浏览器缓冲结束和扬声器首声是不同指标。
 
 ### 语言支持
 - **引擎支持中日英**（G2P/BERT 前端 + `text_language` 参数）。
-- ⚠️ **firefly 模型只训了中文**：英/日会念不准甚至乱。要英日好需训多语数据或换语种现成角色模型。
+- 流萤 v2 权重只训中文；v3 使用中/英/日/混合数据，但混合语言丢字与音色仍需逐句验证。切换 v3 权重不代表所有语种已通过验收。
+- 梓涵本轮以中文为主要目标；日文 anchor 不等于日语自然度已验收。
 
 ---
 
@@ -124,11 +139,11 @@ Live2D 桌宠「流萤」的语音方案 v2。目标是 **15 岁年龄感 + 多�
 
 ## 六、流式 TTS 服务（`tools/tts_server.py`）
 
-引擎：GSV-TTS-Lite（torch GPU 推理，质量=torch）+ token 级流式。
+当前本机服务使用 GSV-TTS-Lite + token / sentence 流式。以下双音色 API 对应运行优化分支，需要另行准备本机模型与参考音频。
 
 ```bash
 # 启动服务（Windows）
-D:/miniforge3/envs/gsv/python.exe tools/tts_server.py          # 0.0.0.0:9880
+D:/miniforge3/envs/gsv/python.exe tools/tts_server.py --host 127.0.0.1 --port 9880
 # 离线测各情绪首字延迟 + 存 wav
 D:/miniforge3/envs/gsv/python.exe tools/tts_server.py --bench
 # 生成与 torch 基准同文本音频（A/B 用）
@@ -140,17 +155,23 @@ D:/miniforge3/envs/gsv/python.exe tools/tts_server.py --compare
 ```
 POST /api/tts
   {"text": "今天天气真好呢，我们去散步吧", "emotion": "温柔", "speaker": "firefly",
-   "stream_mode": "token"}   # token=首字最低(~120ms) | sentence=句子级更稳(demo 用)
+   "stream_mode": "token"}   # token 或 sentence；切换梓涵用 speaker=zihan
   → 200, Content-Type: audio/L16; rate=32000; channels=1
-    响应体 = 原始 int16 PCM 逐块流，首块到达即"首字延迟"
-GET /health      → 引擎/模型/GPU/情绪列表
+    响应体 = 原始 int16 PCM 逐块流，不是 WAV；X-TTS-Speaker 标记音色
+GET /health      → 引擎/实际模型/GPU/当前及 loadingSpeaker 状态
+GET /api/voices  → 音色 ID、标签、ready 与各自支持的情绪
+GET /api/speakers → /api/voices 别名
 GET /demo        → 浏览器流式试听页（Web Audio 实时播放，验证流式用耳朵）
 ```
 
 ### 试听验证（耳朵最精确）
 1. 启动服务后浏览器打开 **`http://localhost:9880/demo`**
 2. 选情绪、输入文本 → 点「生成并播放」
-3. 首字约 100–500ms 出声，之后连续播放；页面实时显示首块延迟/块数/音频总长
+3. 页面显示首块延迟/块数/音频总长；实际首声还受播放缓冲影响，不能用首块时间代替。
+
+运行时只驻留一套角色 GPT/SoVITS，公共 BERT/CNHubert/SV 复用。切换需重载角色权重并清理相关参考缓存；流式结束或取消完成后才释放模型锁。原生加载不能即时中断，连续取消后换角色仍可能等待两次加载。
+
+**AiriLife 管理与远端配置**：应用托管实例可从语音服务管理入口停止；停止服务不会顺带关闭 QQ 或后端。`startup.voice` 控制本机自动启动，`voice.url` 用于 Electron 健康检查，`tts.gptsovitsUrl` 才是后端实际合成地址。迁往 Tailscale 远端时需同时核对这些配置；本次未执行迁移，也未改自动启动设置。
 
 ### 输出目录
 - `output/bench/`    —— `--bench` 各情绪 wav（基准句）
@@ -176,8 +197,9 @@ python tools/tts_server.py        # 首次自动下载预训练模型到 gsv_mod
 
 **多端注意事项**：
 - 路径映射：WSL2 `/mnt/e/PROJECT/Airilife_voice_v2` ≡ Windows `E:\PROJECT\Airilife_voice_v2`。
-- ⚠️ 本分支是 WSL 建的 linked worktree：`.git` 指向 `/mnt/e/...`，**Windows git 打不开本目录**；提交/推送去主仓库 `E:\PROJECT\Airilife_voice`（共享对象库，`git push origin v2`）。
+- 本分支是 WSL 创建的 linked worktree，`.git` 指向 `/mnt/e/...`，Windows Git 直接进入目录会失败。保留原指针；本机已验证可显式指定路径，例如 `git --git-dir=E:/PROJECT/Airilife_voice/.git/worktrees/Airilife_voice_v2 --work-tree=E:/PROJECT/Airilife_voice_v2 status`，提交/推送沿用相同前缀。训练仍使用原 WSL 环境。
 - GPU：Windows 用 CUDA 12.8；WSL2 内 CUDA 镜像内建。
+- 当前服务没有现成的低显存/CPU 部署开关。2GB GTX 1650 的兼容性、推理峰值、延迟和音质均未测；需独立评估卸载/低显存方案，不能仅凭 Tailscale 连通就判定可部署。
 
 ---
 
@@ -187,12 +209,16 @@ python tools/tts_server.py        # 首次自动下载预训练模型到 gsv_mod
 - [x] v2Pro **不行**（ONNX 骨架不兼容）；v2ProPlus **可行**
 - [x] genie 噪声根因 = 预训练未加载（codebook 近零），重训修复
 - [x] 重训后转 genie 频谱正常，但**音色/尾字仍有退化 → 弃用 genie**
-- [x] **GSV-TTS-Lite 替换**：Windows GPU 部署，质量=torch，TTFT ~120ms，token 级流式
+- [x] **GSV-TTS-Lite 替换**：Windows GPU 部署、token / sentence 流式；性能按第五节的测量范围解读
 - [x] 流式 TTS 服务 `tools/tts_server.py`：`/api/tts` 流式 + `/demo` 试听 + `--bench`/`--compare`
 - [x] 参考音频修正：撒娇甜（蛋糕卷桥段）、生气（7.09s 171）
 - [x] **v3 多语言**：翻译 + CosyVoice3 克隆生成 480 条多语言数据 → 训练 `firefly_v3`（中/英/日/混合）→ demo 验证
 - [ ] ⚠️ **v3 中文发音模糊（待排查）**：已铺 **63 组 s1×s2 网格**（s1 e5-45 × s2 e10-40，5epoch 间隔），见 `output/v3_combos/`（每组 8 情绪）。日志在 `docs/v3_training_logs/`
-- [ ] AiriLife 端对接（流式消费 / QQ 语音）
+- [x] AiriLife 模型→TTS→Gateway 流式消费，双角色切换与取消验收已有记录；本轮 HTTP 数据不替代 QQ 客户端实际听音验收
+- [x] 梓涵中文独立训练与自动门槛通过；双音色 HTTP 切换验证完成（本机资产）
+- [x] 公共引擎复用、health 不随加载阻塞、英文 G2P 预热（运行优化分支）
+- [ ] 梓涵最终主观听音、完整训练资产分发、运行优化分支合入 `v2`
+- [ ] 2GB GTX 1650 / Tailscale 远端部署与实测
 - [ ] v3 换用英语/日语参考音频优化英日音色
 
 ---
@@ -215,9 +241,11 @@ python tools/tts_server.py        # 首次自动下载预训练模型到 gsv_mod
 │   ├── gpt_firefly_678orig-e15.ckpt
 │   ├── sovits_firefly_678orig_e10.pth
 │   ├── gpt_firefly_v3-e15.ckpt      # v3 多语言
-│   ├── sovits_firefly_v3_e10.pth    # v3 多语言
+│   ├── sovits_firefly_v3_e{30,35,40,45,50}_cont.pth  # 本机 v3 候选
+│   ├── zihan/                # 梓涵独立模型与 voice.json（本机未跟踪）
 │   └── genie/firefly_678orig/   # 已弃用 ONNX
 ├── reference_audio/       # 8 情绪原声参考（撒娇甜/生气已换新）
+├── docs/zihan_cn_training.md # 梓涵训练流程、状态入口与 API
 ├── gsv_models/            # GSV 预训练模型（cnhubert/roberta/g2p/sv，~1.3GB，gitignore）
 ├── GenieData/             # genie 残留数据（gitignore）
 ├── output/                # 推理输出（bench/compare/stream，gitignore）
@@ -226,7 +254,7 @@ python tools/tts_server.py        # 首次自动下载预训练模型到 gsv_mod
 
 ---
 
-## 后续优化 TODO
+## 后续优化 TODO（保留原研究方向，尚不代表可用配置）
 
 ### 1. 启用音色/风格解耦（spk ≠ prompt）
 
@@ -245,9 +273,9 @@ python tools/tts_server.py        # 首次自动下载预训练模型到 gsv_mod
 - **GPT 丢字是已知问题**：官方 changelog 明确 V2Pro/V3"GPT 合成更稳定，重复漏字更少"；PR#457（2024.02）加 DPO 损失训练选项"通过构造负样本训练缓解 GPT 重复漏字问题"。我们用的是 V2ProPlus（较稳），若 g2p 输出正确仍丢字，考虑：开 DPO 训练、确保训练集含足够混合语言样本、s1 epoch 不要过低（欠训→注意力不稳→丢字）。
 - 短期 workaround：对混合文本按语种切分，分段合成再拼接，避免 auto-detect 在短段上误判。
 
-### 3. 性能杠杆（未拉）
+### 3. 性能调参候选（需独立基准）
 
-- `TTS(use_flash_attn=True)`：装 Windows 预编译 wheel（[lldacing/flash-attention-windows-wheel](https://huggingface.co/lldacing/flash-attention-windows-wheel)），TTFT 150→133ms、RTF 0.125→0.108、显存再降。RTX 4070 支持。
-- `gpt_cache=[(1, 64), (1, 128)]`：CUDA Graph 静态缓存，省每次推理的 graph 编译开销，稳态 TTFT 再降。
+- `TTS(use_flash_attn=True)`：Windows 预编译 wheel 可参考 [lldacing/flash-attention-windows-wheel](https://huggingface.co/lldacing/flash-attention-windows-wheel)；当前环境未验证收益与兼容性，不预先承诺延迟改善。
+- `gpt_cache=[(1, 64), (1, 128)]`：CUDA Graph 静态缓存候选。当前服务没有显式传入这一参数，实际默认值取决于已安装引擎；先核对版本和基准再调参。
 - `sovits_cache` 调参（流式示例 `[50, 55]` = stream_chunk×2 + overlap）。
 
