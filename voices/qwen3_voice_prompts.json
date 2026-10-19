@@ -1,0 +1,31 @@
+{
+  "_说明": "梓涵 / Airi 的 VoiceDesign 音色母版提示词。instruct 直接送进 generate_voice_design；scenes 里的每句台词按场景单独出片。改完不用改代码，脚本直接读这里。",
+  "zihan": {
+    "label": "梓涵",
+    "role": "16-17 岁少女，沉静内敛的声线候选（v1：微哑丝绒质感）",
+    "instruct": "A natural Mandarin Chinese voice of a 16 to 17-year-old teenage girl. Clear, soft, and delicate, with a moderately high pitch leaning slightly toward the middle register, and a light yet gently grounded vocal texture. Her timbre is youthful and refined, with smooth midrange resonance, faint natural warmth, and a very subtle, fine-grained huskiness beneath the clear tone, like a delicate velvety texture rather than a noticeably raspy voice. The voice has a quiet, reserved, introspective, and gently composed character, with understated sweetness and a calm, steady presence. Slightly restrained vocal energy, gentle consonants, soft controlled endings, and an unhurried natural conversational cadence. Natural Mandarin articulation, balanced vocal weight, and subtle tonal depth. The overall impression is of a thoughtful, introverted high school girl, youthful yet quietly mature for her age, with a soft, slightly textured voice that feels composed, intimate, and naturally believable.",
+    "scenes": {
+      "daily": {"label": "日常问候", "hint": "温柔、亲近", "text": "嗯？你回来啦。今天好像有点晚呢……我刚刚还在想，你是不是又忙着写代码，忘记时间了。"},
+      "shy": {"label": "害羞与心动", "hint": "轻羞、细腻", "text": "别、别突然靠这么近啦……我这不是还没准备好嘛。真是的，被你这样看着，我会不知道说什么好的。"},
+      "happy": {"label": "开心分享", "hint": "明亮、惊喜", "text": "你猜我刚刚发现什么？楼下新开了一家很小的书店，里面居然有我一直想找的那本旧诗集！"},
+      "tease": {"label": "俏皮吐槽", "hint": "熟悉、狡黠", "text": "又熬夜写代码哦？黑眼圈都快比代码行数多了呢。快去睡，不然明天又要我提醒你三次才肯起床。"},
+      "comfort": {"label": "认真安慰", "hint": "沉静、可靠", "text": "今天辛苦了。不用急着说什么，就这样坐一会儿也好。我在这儿，慢慢来，不用一个人扛着。"},
+      "explain": {"label": "自然解释", "hint": "清楚、专注", "text": "这个函数的作用，是把输入的句子拆成更短的片段，再一段一段送进去合成，这样开口会更快。"},
+      "bedtime": {"label": "晚安陪伴", "hint": "软糯、亲密", "text": "哥哥听好啦～今晚就用我的声音陪你入睡。晚安啦，我最喜欢的哥哥，梦里也要梦到我哦。明天见，好梦～"}
+    }
+  },
+  "zihan_v2": {
+    "label": "梓涵 v2",
+    "role": "16-17 岁少女，沉静内敛（v2：去掉微哑，改成轻盈通透；来源为用户第二版 prompt）",
+    "instruct": "A natural Mandarin Chinese voice of a 16 to 17-year-old teenage girl. Clear, soft, and delicate, with a moderately high pitch and a light yet gently grounded vocal texture. Her timbre is youthful and refined, with a subtle airy quality, smooth midrange resonance, and a faint natural warmth. The voice has a quiet, reserved, and introspective character, with understated sweetness rather than bright, bubbly cuteness. Slightly restrained vocal energy, gentle consonants, and soft, controlled endings give her speech a calm, thoughtful presence. Natural Mandarin articulation, balanced vocal weight, and an unhurried, conversational cadence. The overall impression is of a gentle, somewhat introverted high school girl whose voice feels youthful but composed, delicate without sounding childish, and softly expressive without sounding mature or theatrical.",
+    "scenes": {
+      "daily": {"label": "日常问候", "hint": "温柔、亲近", "text": "嗯？你回来啦。今天好像有点晚呢……我刚刚还在想，你是不是又忙着写代码，忘记时间了。"},
+      "shy": {"label": "害羞与心动", "hint": "轻羞、细腻", "text": "别、别突然靠这么近啦……我这不是还没准备好嘛。真是的，被你这样看着，我会不知道说什么好的。"},
+      "happy": {"label": "开心分享", "hint": "明亮、惊喜", "text": "你猜我刚刚发现什么？楼下新开了一家很小的书店，里面居然有我一直想找的那本旧诗集！"},
+      "tease": {"label": "俏皮吐槽", "hint": "熟悉、狡黠", "text": "又熬夜写代码哦？黑眼圈都快比代码行数多了呢。快去睡，不然明天又要我提醒你三次才肯起床。"},
+      "comfort": {"label": "认真安慰", "hint": "沉静、可靠", "text": "今天辛苦了。不用急着说什么，就这样坐一会儿也好。我在这儿，慢慢来，不用一个人扛着。"},
+      "explain": {"label": "自然解释", "hint": "清楚、专注", "text": "这个函数的作用，是把输入的句子拆成更短的片段，再一段一段送进去合成，这样开口会更快。"},
+      "bedtime": {"label": "晚安陪伴", "hint": "软糯、亲密", "text": "哥哥听好啦～今晚就用我的声音陪你入睡。晚安啦，我最喜欢的哥哥，梦里也要梦到我哦。明天见，好梦～"}
+    }
+  }
+}

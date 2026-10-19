@@ -20,6 +20,9 @@ GenieData/
 # GSV-TTS-Lite 预训练模型（cnhubert/roberta/g2p/sv，~1.3GB，首次运行自动下载）
 gsv_models/
 
+# Qwen3-TTS 权重（VoiceDesign + Base，~11GB，用 tools/fetch_qwen3_tts_models.py 从 ModelScope 拉取）
+models/qwen3-tts/
+
 # Claude 本地配置
 .claude/
 

@@ -5,6 +5,10 @@ AiriLife 桌宠的本地 TTS 方案：GPT-SoVITS v2ProPlus 训练、GSV-TTS-Lite
 > 本分支（`v2`）记录 GPT-SoVITS 方案。`master` 是旧 CosyVoice3 部署方案；CosyVoice3 仍用于部分教师数据生成。
 >
 > 训练在 WSL2，**推理/部署在 Windows**（GPU：RTX 4070 Laptop）。
+>
+> 本仓库另有 [`qwen3-tts`](docs/qwen3_tts_local.md) 分支，记录 Qwen3-TTS（VoiceDesign 设计原创音色 +
+> Base 参考克隆 + faster-qwen3-tts CUDA Graph 加速）的 Windows 本地实验与实测数据。
+> 该分支**不替换**本分支的 GPT-SoVITS 服务，只作为第二音色路线。
 
 新海天中文独立训练与双音色切换：见 [流程与状态说明](docs/zihan_cn_training.md)。默认流萤不变，新音色通过 `speaker=zihan` 选择。
 
