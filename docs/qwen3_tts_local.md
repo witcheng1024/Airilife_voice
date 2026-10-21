@@ -53,18 +53,18 @@ pip install "transformers==5.15.1"     # ⚠️ 见下方踩坑
 
 ```powershell
 conda activate qwen3-tts
-python tools/fetch_qwen3_tts_models.py --list          # 先看体积
-python tools/fetch_qwen3_tts_models.py                 # 三个都下
-python tools/fetch_qwen3_tts_models.py --only voice-design
+python tools/qwen/fetch_qwen3_tts_models.py --list          # 先看体积
+python tools/qwen/fetch_qwen3_tts_models.py                 # 三个都下
+python tools/qwen/fetch_qwen3_tts_models.py --only voice-design
 ```
 
 | 模型 | 体积 | 落到 |
 |---|---|---|
-| `Qwen3-TTS-12Hz-1.7B-VoiceDesign` | 4.21 GB | `models/qwen3-tts/Qwen3-TTS-12Hz-1.7B-VoiceDesign/` |
-| `Qwen3-TTS-12Hz-1.7B-Base` | 4.23 GB | `models/qwen3-tts/Qwen3-TTS-12Hz-1.7B-Base/` |
-| `Qwen3-TTS-12Hz-0.6B-Base` | 2.34 GB | `models/qwen3-tts/Qwen3-TTS-12Hz-0.6B-Base/` |
+| `Qwen3-TTS-12Hz-1.7B-VoiceDesign` | 4.21 GB | `models/base/qwen3-tts/Qwen3-TTS-12Hz-1.7B-VoiceDesign/` |
+| `Qwen3-TTS-12Hz-1.7B-Base` | 4.23 GB | `models/base/qwen3-tts/Qwen3-TTS-12Hz-1.7B-Base/` |
+| `Qwen3-TTS-12Hz-0.6B-Base` | 2.34 GB | `models/base/qwen3-tts/Qwen3-TTS-12Hz-0.6B-Base/` |
 
-合计 10.8 GB，已加入 `.gitignore`（`models/qwen3-tts/`），权重不进 git。
+合计 10.8 GB，已加入 `.gitignore`（`models/base/qwen3-tts/`），权重不进 git。
 每个仓库自带 `speech_tokenizer/`（651MB），三个都存一份换来「单目录直接 from_pretrained」。
 
 ## 四、音色设计工作流
@@ -80,11 +80,11 @@ python tools/fetch_qwen3_tts_models.py --only voice-design
 ```powershell
 conda activate qwen3-tts
 # 全部场景出片
-python tools/qwen3_voice_design.py --voice zihan_v2
+python tools/qwen/qwen3_voice_design.py --voice zihan_v2
 # 只出几句话 / 出 3 个随机采样挑最好的
-python tools/qwen3_voice_design.py --voice zihan --scenes daily bedtime --take 3
+python tools/qwen/qwen3_voice_design.py --voice zihan --scenes daily bedtime --take 3
 # 自由台词
-python tools/qwen3_voice_design.py --voice zihan --text "嗯？你回来啦。" --tag free
+python tools/qwen/qwen3_voice_design.py --voice zihan --text "嗯？你回来啦。" --tag free
 ```
 
 产物：`output/qwen3_voice_design/<voice>/<日期_时间>/`
@@ -96,8 +96,8 @@ python tools/qwen3_voice_design.py --voice zihan --text "嗯？你回来啦。" 
 
 ```powershell
 conda activate qwen3-tts-fast
-python tools/qwen3_base_clone_check.py ^
-  --ref output\qwen3_voice_design\zihan_v2\<run>\daily_t1.wav ^
+python tools/qwen/qwen3_base_clone_check.py ^
+  --ref models\zelia\qwen_v2\daily_t1.wav ^
   --ref-text "嗯？你回来啦。今天好像有点晚呢……我刚刚还在想，你是不是又忙着写代码，忘记时间了。" ^
   --voice zihan_v2 --model 0.6b --reps 3 --modes icl xvec
 ```
@@ -122,8 +122,8 @@ python tools/qwen3_base_clone_check.py ^
 
 ```powershell
 conda activate qwen3-tts-fast
-python tools/bench_faster_qwen3.py --model 0.6b-base --chunks 8 --reps 3
-python tools/bench_faster_qwen3.py --model 1.7b-base --chunks 8 4 1 --reps 3
+python tools/qwen/bench_faster_qwen3.py --model 0.6b-base --chunks 8 --reps 3
+python tools/qwen/bench_faster_qwen3.py --model 1.7b-base --chunks 8 4 1 --reps 3
 ```
 
 | 模型 | chunk | 文本 | TTFA | 音频/耗时 | 倍速 | 整卡显存 |
@@ -153,22 +153,8 @@ chunk=4 是首包/吞吐的平衡点，chunk=8 吞吐最好。
 **当前结论**：GPT-SoVITS 仍是默认引擎。Qwen3-TTS 的价值在「原创声线 + 双角色低切换成本」，
 要进 AiriLife 还需要先改音频格式契约（见第八节）。
 
-## 八、接入 AiriLife 需要改的地方（已调研，未改动）
+## 八、接入 AiriLife（2026-10-21 已完成）
 
-AiriLife 现有 TTS 链路：`chatSessionCoordinator` → `AssistantSpeechStream.pump()`
-→ `TtsService.synthesizeStream()` → `/api/tts`（裸 PCM）→ `gatewayHub.pushAudioChunk()`
-→ 桌宠 `LipSyncPlayer`。
-
-三个必须先解决的问题：
-
-1. **采样率写死 32000**。`packages/shared/src/tts.ts` 的 `TTS_PCM_FORMAT` 是 32k，
-   `packages/pet-window-core/src/api/proactiveEvents.ts:200` 用 `isTtsPcmFormat` 严格校验，
-   Qwen3-TTS 输出 **24000Hz** 会被**静默丢帧、无日志**。必须先改成按 chunk 携带真实采样率。
-2. **流式白名单**。`ttsService.ts:621` 现在是 `if (provider !== 'gptsovits') yield await this.synthesize()`，
-   新 provider 漏改这里会**静默退化成整句合成**，测试也不会报错。
-3. **配置白名单**。`ttsService.ts` 的 `agentVoicesSchema.strict()` 与 `agentManager.parseAgentVoice()`
-   两处都是硬编码字段名，新音色字段漏加会被丢弃或直接抛错。
-
-推荐做法：把已有的 `GptSoVitsJob` 泛化成 provider-neutral 的 `TtsJob`，
-引入 `TtsProviderAdapter`（`synthesize / synthesizeStream / getStatus / isAvailable`），
-让 `synthesize()` / `synthesizeStream()` 各自只剩一次查表。
+常驻服务 `tools/serve/qwen_tts_server.py`，与 GSV `tools/serve/tts_server.py` 同一 HTTP 协议（引擎名 `qwen3-tts`、24 kHz）。
+AiriLife 侧改为按服务 `Content-Type` 透传采样率，详见仓库 README「在 AiriLife 中使用」与 AiriLife 的 `.docs/DEV_QUICKSTART.md`。
+上文「整卡显存」口径有误：表中是 torch reserved，整卡占用以 `bench` JSON 的 device_used 为准（0.6B 约 4.6 GB）。

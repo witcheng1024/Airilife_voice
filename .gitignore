@@ -54,3 +54,14 @@ OVERNIGHT_STATUS.txt
 # 训练中间产物（不应入库）
 data/
 exp/
+
+# ── 2026-10-21 按角色整理后的大文件（不入库，各机器自备） ──
+# 共用底座：Qwen3-TTS 权重（tools/qwen/fetch_qwen3_tts_models.py 拉取）、GSV 预训练（首次运行自动下载）
+models/base/
+# 梓涵 GSV 微调权重（~800MB）与 Qwen v1 设计稿（已被 v2 取代）
+models/zelia/gsv/
+models/zelia/qwen_v1/
+# 归档：未选用的训练轮次、训练语料
+archive/
+# 生成与基准产物
+output/

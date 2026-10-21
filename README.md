@@ -1,285 +1,91 @@
-# AiriLife 本地语音 v2 — 流萤 / 梓涵 · GPT-SoVITS v2ProPlus
+# AiriLife Voice — 角色语音服务
 
-AiriLife 桌宠的本地 TTS 方案：GPT-SoVITS v2ProPlus 训练、GSV-TTS-Lite 推理，支持流萤及梓涵（新海天中文）音色与多情绪表达。训练在 WSL2，当前推理在 Windows / RTX 4070 Laptop。
+AiriLife 的本机语音服务与角色声音资产。AiriLife 通过 HTTP 调用这里的服务，把角色的回复读出来（桌宠流式播放、对话框朗读、QQ 语音）。
 
-> 本分支（`v2`）记录 GPT-SoVITS 方案。`master` 是旧 CosyVoice3 部署方案；CosyVoice3 仍用于部分教师数据生成。
->
-> 训练在 WSL2，**推理/部署在 Windows**（GPU：RTX 4070 Laptop）。
->
-> 本仓库另有 [`qwen3-tts`](docs/qwen3_tts_local.md) 分支，记录 Qwen3-TTS（VoiceDesign 设计原创音色 +
-> Base 参考克隆 + faster-qwen3-tts CUDA Graph 加速）的 Windows 本地实验与实测数据。
-> 该分支**不替换**本分支的 GPT-SoVITS 服务，只作为第二音色路线。
+当前默认引擎是 **Qwen3-TTS**（2026-10-21 起），GPT-SoVITS 保留为备用。两者 HTTP 协议相同，同一时间只在 9880 端口跑其中一个。
 
-新海天中文独立训练与双音色切换：见 [流程与状态说明](docs/zihan_cn_training.md)。默认流萤不变，新音色通过 `speaker=zihan` 选择。
+| 角色 | 服务内音色 ID | Qwen3-TTS 声线 | GPT-SoVITS 声线 |
+| --- | --- | --- | --- |
+| 梓涵（Zelia） | `zihan` | **v2 原创声线**（VoiceDesign 设计的定稿母版，Base 克隆） | 中文微调模型 |
+| Airi | `firefly` | 流萤（用 GSV 参考音频临时克隆，待设计 Airi 专属声线） | 流萤微调模型 |
 
-## 当前状态（2026-10-15）
+> 音色 ID 是 AiriLife 角色包里 `voice.speaker` 绑定的值，改名需要同步 AiriLife 侧。界面上显示的是角色名，不显示 ID 与版本号。
 
-| 范围 | 状态与入口 |
-|---|---|
-| 当前本机服务 | 已接入 AiriLife 的模型→TTS→Gateway 流式播放链路；本次按用户要求停止，`9880` 已释放 |
-| 已发布运行优化代码 | [`feat/voice-runtime-acceptance`](https://github.com/witcheng1024/Airilife_voice/tree/feat/voice-runtime-acceptance)，包括双音色注册、共享引擎、串行切换、取消释放和 G2P 预热；[交接与验证范围](https://github.com/witcheng1024/Airilife_voice/blob/feat/voice-runtime-acceptance/.docs/HANDOFF_voice-runtime-acceptance.md) |
-| `v2` 与本机工作区 | 本机 `tools/tts_server.py` 已应用上述运行优化；本次只发布文档，**没有将运行优化分支合入 `v2`**。仅 checkout 远端 `v2` 不会得到当前完整双音色服务 |
-| 梓涵训练 | 本机自动训练/验证完成，选择 `s1e5_s2e10`，固定测试 10/10 通过、平均 CER 约 0.0095；最终主观听音仍为 `pending` |
-| 模型与训练资产 | 梓涵模型、参考音频、训练脚本及新增 v3 权重仍有本机未跟踪文件，本次文档提交不包含它们；不能把本机可运行等同于远端可完整复现 |
-| 另一台电脑部署 | GTX 1650 / 2GB VRAM / 16GB RAM + Tailscale 尚未部署验证；当前测得常驻约 1.86GB VRAM、2.75GB RAM，2GB 卡不宜按现配置直接认定可用 |
-
----
-
-## 一、技术选型
-
-| 环节 | 方案 | 说明 |
-|---|---|---|
-| 训练 | GPT-SoVITS **v2ProPlus** | 流萤中文 / 多语言训练；梓涵独立中文教师数据 + 日文 anchor 训练 |
-| 推理引擎 | **GSV-TTS-Lite 0.4.7** | PyTorch GPU 推理（CUDA Graph / KV Cache / fp16）；音色与自然度需试听验收 |
-| ~~genie-tts~~ | ~~ONNX 引擎~~ | ~~已弃用：ONNX 有音色退化 + 尾字截断（genie issue #31）~~ |
-| 声线方案 | 原声数据训练 + 参考音频带情绪/年龄感 | EQ/asetrate 变调无效，年轻感靠推理时换参考 |
-
-**为什么弃 genie-tts 换 GSV-TTS-Lite**：早期 ONNX 路线出现尾字截断、语调和音色退化。GSV-TTS-Lite 使用 PyTorch 权重并优化执行方式，避免该转换路径。早期速度对比不作为当前端到端延迟承诺，实际结果见下方实测范围。
-
----
-
-## 二、数据
-
-- **训练数据**：`data/firefly_678_orig` — 678 条**原声**（无 asetrate/EQ 处理）。
-- **情绪参考**（推理时用，本仓库 `reference_audio/`）：8 情绪原声样本
-
-| 情绪 | 参考样本 | 参考文本 |
-|---|---|---|
-| 平淡 | `chapter3_2_firefly_223` | 我叫流萤，是鸢尾花家系的艺者。 |
-| 活泼 | `chapter3_2_firefly_164` | 好啦！看上去真不错，你好上相呀。 |
-| 撒娇甜 | `chapter3_2_firefly_135`（蛋糕卷桥段） | 我最喜欢这家店的橡木蛋糕卷，每天都要吃一个。 |
-| 温柔 | `chapter3_3_firefly_177` | 这里是游客不会踏足的拓荒地，所以不像市中心那样热闹…但我很喜欢这种僻静的气氛。 |
-| 悲伤 | `chapter3_30_firefly_125` | 嗯，是我不好。对不起。 |
-| 惊讶 | `chapter3_30_firefly_123` | 真的吗？看来…卡芙卡教给我的没错。 |
-| 生气 | `chapterfinality1_4_firefly_171`（7.09s） | 绝对不行，难道你忘了吗？作为星核猎手，我有一项不惜一切代价的「零点任务」—— |
-| 紧张 | `chapter3_20_firefly_162` | 小心，更多怪物进来了！准备开火！ |
-
-> 参考必须与音频文本匹配（`prompt_text`）。曾踩坑：生气提交过 2.6s 的 169_f 剪辑（<3s，genie 直接警告、合成全乱）；撒娇甜换过 163 合影句，不够甜 → 换成蛋糕卷桥段。
-
----
-
-## 三、训练管线
-
-一键脚本：`tools/run_overnight_pipeline.sh`（已适配 v2ProPlus）
+## 目录
 
 ```
-流程：数据准备 → 特征提取 → s2(SoVITS 10ep) → s1(GPT 15ep) → 多情绪推理
-用法：
-  bash tools/run_overnight_pipeline.sh                          # 全流程
-  bash tools/run_overnight_pipeline.sh --skip-process --skip-features   # 复用已有数据/特征
+models/
+  airi/          Airi
+    gsv/           GPT-SoVITS 权重（LFS）
+    references/    8 种情绪参考音频（GSV 推理参考，也是 Qwen 克隆参考）
+  zelia/         梓涵
+    qwen_v2/       ★ Qwen 定稿母版：7 个场景 wav + manifest.json + index.html 试听页
+    references/    GSV 情绪参考音频
+    voice.json     GSV 音色清单（模型路径、情绪参考）
+    gsv/           GSV 微调权重（不入库）
+    qwen_v1/       Qwen v1 设计稿（已被 v2 取代，不入库）
+  base/          共用底座（不入库）
+    qwen3-tts/     Qwen3-TTS 0.6B / 1.7B Base、1.7B VoiceDesign
+    gsv/           GSV-TTS-Lite 预训练模型（首次运行自动下载）
+voices/
+  qwen3_voices.json         ★ Qwen 服务音色清单：每个情绪 = 一条母版 wav + 逐字台词
+  qwen3_voice_prompts.json  VoiceDesign 声线描述与场景台词（设计新声线用）
+tools/
+  serve/          常驻服务：qwen_tts_server.py、tts_server.py（GSV）、voice_registry.py
+  qwen/           Qwen 工具：声线设计、克隆一致性检查、基准、模型下载
+  gsv_training/   GPT-SoVITS 训练与评估脚本（WSL）
+docs/             qwen3_tts_local.md（Qwen 部署细节）、gsv_v2_history.md（GSV 训练历程）等
+archive/          不再使用但保留：未选用的训练轮次、训练语料（不入库）
 ```
 
-配套脚本（放在 GPT-SoVITS 目录）：`auto_s2train.sh` / `monitor_train.sh`（崩溃自动续训）、`run_young_features.sh`、`tools/export_ckpt.py`。
+整理约定：每个角色一个目录，放这个角色专属的权重、参考音频和定稿母版；多个角色共用的模型放 `models/base/`；试听、基准等临时产物写到 `output/`（不入库，可随时删）；不再使用但还想留着的放 `archive/`。
 
-### ⚠️ 重大教训：预训练路径必须绝对路径
-`tmp_s2.json` 的 `pretrained_s2G/s2D` 若用相对路径 → 预训练被静默跳过、模型随机初始化 → genie 转换后输出高频噪声/空音频。验证：`log_s2_auto.txt` 应出现 `loaded pretrained ... All keys matched successfully` 且无 `kmeans start`。
+## 启动服务
 
----
+正常由 AiriLife 托管启动：设置 → 外部服务 → 语音服务。工作目录填本仓库根目录，并勾选随应用启动。
 
-## 四、模型文件与分发范围
+| 引擎 | Python 环境 | 脚本 |
+| --- | --- | --- |
+| Qwen3-TTS（默认） | `D:\miniforge3\envs\qwen3-tts-fast\python.exe` | `tools\serve\qwen_tts_server.py` |
+| GPT-SoVITS | `D:\miniforge3\envs\gsv\python.exe` | `tools\serve\tts_server.py` |
 
-| 文件 | 大小 | 说明 |
-|---|---|---|
-| `models/gpt_firefly_678orig-e15.ckpt` | ~150MB | s1 GPT（文本→语义 token），v2 中文 |
-| `models/sovits_firefly_678orig_e10.pth` | ~165MB | s2 SoVITS（语义→音频），v2 中文 |
-| `models/gpt_firefly_v3-e15.ckpt` | ~150MB | s1 GPT，**v3 多语言** e15（发音较清晰，备选） |
-| `models/gpt_firefly_v3-e20.ckpt` | ~150MB | s1 GPT，**v3 多语言** e20（**定版**） |
-| `models/sovits_firefly_v3_e{30,35,40,45,50}_cont.pth` | 各~165MB | s2 SoVITS，**v3 多语言** e30-e50（本地选用 **e40**） |
-| `models/genie/firefly_678orig/` | ~321MB | ~~旧 genie ONNX 产物~~（已弃用，保留参考） |
+手动调试：
 
-> 流萤 v3 的本地选定组合为 **s1e20_s2e40 + text_language=zh**。这是该次网格比较的选择，不意味着 epoch 越大普遍越好。`tts_server.py` 未配置 `GSV_GPT/GSV_SOV` 时仍默认 v2 中文 `e15/e10`；以环境变量和 `/health` 实际模型路径为准。
-
-> 表中包含本机资产清单，并非全部已发布到 Git LFS。新增 v3 权重、`models/zihan/`、`reference_audio/zihan/` 当前仍有未跟踪文件。早期只核对过部分文件头哈希，不能据此声称整个权重文件逐字节一致。
-
----
-
-## 五、推理与实时性（分清测量边界）
-
-当前实测环境：**Windows / RTX 4070 Laptop / GSV-TTS-Lite 0.4.7**。以下数据来自不同请求与测量层，不宜混作同一种“首字时间”。
-
-| 范围 | 实测值 | 边界 |
-|---|---|---|
-| 早期单音色基准 | warm HTTP 首音频字节约 120ms；首次 417–494ms，RTF 约 0.1 | 历史基准，不代表冷切音色或完整应用 |
-| 运行优化后的短句 HTTP 冷切 | 3.151s / 2.781s；此前 21.028s / 16.171s | 到首 PCM；公共引擎复用，一次常驻一套角色权重 |
-| AiriLife 实际包完整链路 | 梓涵冷切 52 字 5.509s；流萤冷切 48 字 4.770s；流萤热 64 字 2.366s | 模型请求至 Gateway 首非零 PCM，非扬声器首声 |
-| 完整服务启动 | 23.423s | 含公共模型与英文 G2P 预热，连续健康轮询测得 |
-| 切换期间健康检查 | 102 次采样、65 次 loading，零超时、最大 181ms | 健康检查可响应不等于音色已加载完毕 |
-| 资源快照 | Torch allocated 1501.9MiB / reserved 1694.0MiB；另一次进程观测约 1.86GB VRAM / 2.75GB RAM | 一套角色权重；不同工具口径不相加，不代表推理峰值 |
-
-完整证据见运行优化分支交接。尚未证明所有请求恒定 1–2 秒；HTTP 首字节、非零 PCM、浏览器缓冲结束和扬声器首声是不同指标。
-
-### 语言支持
-- **引擎支持中日英**（G2P/BERT 前端 + `text_language` 参数）。
-- 流萤 v2 权重只训中文；v3 使用中/英/日/混合数据，但混合语言丢字与音色仍需逐句验证。切换 v3 权重不代表所有语种已通过验收。
-- 梓涵本轮以中文为主要目标；日文 anchor 不等于日语自然度已验收。
-
----
-
-## 五·五、v3 多语言（2026-08-03）
-
-**目标**：在 v2 中文基础上，让流萤会中/英/日 + 中英混说（code-switching）。
-
-**多语言数据集**（`data/firefly_multilingual/`，1158 条）：
-| 语种 | 条数 | 来源 |
-|---|---|---|
-| 中文 | 678 | 原 v2 数据（复制到统一目录） |
-| 英文 | 200 | firefly 台词翻译（SJTU qwen3.6-27b）+ **CosyVoice3 音色克隆** |
-| 日文 | 200 | 同上 |
-| 中英/中日混合 | 80 | SJTU 生成混合台词 + CosyVoice3 克隆 |
-
-生成管线（Windows）：
-- `tools/prep_multilingual.py` —— 翻译（qwen3.6-27b，每 key 10 次/分限速，断点续传）
-- `tools/gen_codeswitch.py` —— 生成混合语种台词源
-- `tools/gen_multilingual.py` / `gen_multilingual_mix.py` —— CosyVoice3 instruct2 克隆合成（firefly 音色）
-- `tools/assemble_multilingual.py` —— 组装 train.list（/mnt/e 路径，2-get-hubert 要求 wav 平铺）
-
-**v3 训练**（WSL，`tools/run_v3_pipeline.sh`）：`firefly_v3`，v2ProPlus，s2 10ep + s1 15ep。
-权重：`models/gpt_firefly_v3-e15.ckpt` + `models/sovits_firefly_v3_e10.pth`。
-
-**验证/生成**：统一入口 `tools/gen_v3.py`（子命令：demo / emotions / combos / long / style，默认定版 s1e20_s2e40 + zh），输出 `output/v3_samples/`。
-桌宠对话格式（`（动作）台词`）用 `tools/tts_dialogue.py`（动作停顿 + 标点分档停顿 + 分句绕截断）。
-
----
-
-## 六、流式 TTS 服务（`tools/tts_server.py`）
-
-当前本机服务使用 GSV-TTS-Lite + token / sentence 流式。以下双音色 API 对应运行优化分支，需要另行准备本机模型与参考音频。
-
-```bash
-# 启动服务（Windows）
-D:/miniforge3/envs/gsv/python.exe tools/tts_server.py --host 127.0.0.1 --port 9880
-# 离线测各情绪首字延迟 + 存 wav
-D:/miniforge3/envs/gsv/python.exe tools/tts_server.py --bench
-# 生成与 torch 基准同文本音频（A/B 用）
-D:/miniforge3/envs/gsv/python.exe tools/tts_server.py --compare
+```powershell
+D:\miniforge3\envs\qwen3-tts-fast\python.exe tools\serve\qwen_tts_server.py --host 127.0.0.1 --port 9880
+D:\miniforge3\envs\qwen3-tts-fast\python.exe tools\serve\qwen_tts_server.py --bench   # 不起服务，测首包与实时倍率
+curl.exe -s http://127.0.0.1:9880/health
 ```
 
-### API
+两套环境的安装方法与踩坑记录见 `docs/qwen3_tts_local.md`。
 
-```
-POST /api/tts
-  {"text": "今天天气真好呢，我们去散步吧", "emotion": "温柔", "speaker": "firefly",
-   "stream_mode": "token"}   # token 或 sentence；切换梓涵用 speaker=zihan
-  → 200, Content-Type: audio/L16; rate=32000; channels=1
-    响应体 = 原始 int16 PCM 逐块流，不是 WAV；X-TTS-Speaker 标记音色
-GET /health      → 引擎/实际模型/GPU/当前及 loadingSpeaker 状态
-GET /api/voices  → 音色 ID、标签、ready 与各自支持的情绪
-GET /api/speakers → /api/voices 别名
-GET /demo        → 浏览器流式试听页（Web Audio 实时播放，验证流式用耳朵）
-```
+## HTTP 协议（两套服务相同）
 
-### 试听验证（耳朵最精确）
-1. 启动服务后浏览器打开 **`http://localhost:9880/demo`**
-2. 选情绪、输入文本 → 点「生成并播放」
-3. 页面显示首块延迟/块数/音频总长；实际首声还受播放缓冲影响，不能用首块时间代替。
+- `POST /api/tts`：请求体 `{"text": "...", "emotion": "温柔", "speaker": "zihan", "stream_mode": "token"}`，返回裸 int16 PCM 流。`Content-Type: audio/L16; rate=<采样率>; channels=1`，Qwen 是 24000，GSV 是 32000。AiriLife 按这个头播放。
+- `GET /health`：`{ok, engine: "qwen3-tts" | "gsv-tts-lite", status: ready | loading | unavailable, voices, ...}`
+- `GET /api/voices`：音色和各自支持的情绪。AiriLife 据此做情绪适配，服务不支持的情绪会回落到「平淡」。
 
-运行时只驻留一套角色 GPT/SoVITS，公共 BERT/CNHubert/SV 复用。切换需重载角色权重并清理相关参考缓存；流式结束或取消完成后才释放模型锁。原生加载不能即时中断，连续取消后换角色仍可能等待两次加载。
+## Qwen3-TTS：延迟与参数
 
-**AiriLife 管理与远端配置**：应用托管实例可从语音服务管理入口停止；停止服务不会顺带关闭 QQ 或后端。`startup.voice` 控制本机自动启动，`voice.url` 用于 Electron 健康检查，`tts.gptsovitsUrl` 才是后端实际合成地址。迁往 Tailscale 远端时需同时核对这些配置；本次未执行迁移，也未改自动启动设置。
+RTX 4070 Laptop 8 GB 上，0.6B Base + ICL，chunk 4：
 
-### 输出目录
-- `output/bench/`    —— `--bench` 各情绪 wav（基准句）
-- `output/compare/`  —— `--compare` 各情绪 短句/长句 wav，与 `runs/Airi_678orig_v2ProPlus_v2/推理` 同名文件 A/B
-- `output/`、`GenieData/`、`gsv_models/` 均已 gitignore
+| 测量层 | 首包 | 实时倍率 |
+| --- | --- | --- |
+| 服务内（`--bench`） | 梓涵约 305 ms，流萤约 240 ms | 1.2–2.0× |
+| AiriLife 后端收到首块 | 275–340 ms | 1.2–1.9× |
 
----
+- `--chunk-size`：越小首包越快、吞吐越低。4 是默认值；8 的首包在 390–480 ms；1 跟不上实时。
+- 服务启动时会把每条参考音频都预热一遍，包括参考特征缓存和 CUDA Graph，所以首个真实请求不会更慢。加载加预热大约 25–100 秒。
+- 显存：0.6B 进程约占 3.4 GB。8 GB 卡上不要和 GSV 同时常驻。
+- 不在请求路径里调用 VoiceDesign，声线以定稿母版为准。同一段描述每次重新设计出来的声音都会漂移。
 
-## 七、部署（Windows/WSL 多端）
+## 常见维护
 
-| 端 | 位置 | 环境 | 用途 |
-|---|---|---|---|
-| 训练/开发端 | WSL2 Ubuntu 24.04 | conda `tts` env（Python 3.11、torch 2.5.1+cu121、GPT-SoVITS 完整目录） | 训练、导出权重 |
-| **部署/推理端** | **Windows** | conda `gsv` env（Python 3.11 + torch cu128 + gsv-tts-lite，见 `requirements.txt`） | FastAPI 流式 TTS 服务 |
-
-**Windows 部署步骤**：
-```bash
-conda create -n gsv python=3.11 -y
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-pip install -r requirements.txt
-python tools/tts_server.py        # 首次自动下载预训练模型到 gsv_models/（~1.3GB）
-```
-
-**多端注意事项**：
-- 路径映射：WSL2 `/mnt/e/PROJECT/Airilife_voice_v2` ≡ Windows `E:\PROJECT\Airilife_voice_v2`。
-- 本分支是 WSL 创建的 linked worktree，`.git` 指向 `/mnt/e/...`，Windows Git 直接进入目录会失败。保留原指针；本机已验证可显式指定路径，例如 `git --git-dir=E:/PROJECT/Airilife_voice/.git/worktrees/Airilife_voice_v2 --work-tree=E:/PROJECT/Airilife_voice_v2 status`，提交/推送沿用相同前缀。训练仍使用原 WSL 环境。
-- GPU：Windows 用 CUDA 12.8；WSL2 内 CUDA 镜像内建。
-- 当前服务没有现成的低显存/CPU 部署开关。2GB GTX 1650 的兼容性、推理峰值、延迟和音质均未测；需独立评估卸载/低显存方案，不能仅凭 Tailscale 连通就判定可部署。
-
----
-
-## 八、验证进度
-
-- [x] genie-tts 2.0.2 装于 `tts` conda 环境，`GENIE_DATA_DIR` 指向 GenieData
-- [x] v2Pro **不行**（ONNX 骨架不兼容）；v2ProPlus **可行**
-- [x] genie 噪声根因 = 预训练未加载（codebook 近零），重训修复
-- [x] 重训后转 genie 频谱正常，但**音色/尾字仍有退化 → 弃用 genie**
-- [x] **GSV-TTS-Lite 替换**：Windows GPU 部署、token / sentence 流式；性能按第五节的测量范围解读
-- [x] 流式 TTS 服务 `tools/tts_server.py`：`/api/tts` 流式 + `/demo` 试听 + `--bench`/`--compare`
-- [x] 参考音频修正：撒娇甜（蛋糕卷桥段）、生气（7.09s 171）
-- [x] **v3 多语言**：翻译 + CosyVoice3 克隆生成 480 条多语言数据 → 训练 `firefly_v3`（中/英/日/混合）→ demo 验证
-- [ ] ⚠️ **v3 中文发音模糊（待排查）**：已铺 **63 组 s1×s2 网格**（s1 e5-45 × s2 e10-40，5epoch 间隔），见 `output/v3_combos/`（每组 8 情绪）。日志在 `docs/v3_training_logs/`
-- [x] AiriLife 模型→TTS→Gateway 流式消费，双角色切换与取消验收已有记录；本轮 HTTP 数据不替代 QQ 客户端实际听音验收
-- [x] 梓涵中文独立训练与自动门槛通过；双音色 HTTP 切换验证完成（本机资产）
-- [x] 公共引擎复用、health 不随加载阻塞、英文 G2P 预热（运行优化分支）
-- [ ] 梓涵最终主观听音、完整训练资产分发、运行优化分支合入 `v2`
-- [ ] 2GB GTX 1650 / Tailscale 远端部署与实测
-- [ ] v3 换用英语/日语参考音频优化英日音色
-
----
-
-## 九、目录结构（本分支）
-
-```
-├── README.md              # 本文档
-├── requirements.txt       # Windows 推理端依赖（torch cu128 + gsv-tts-lite + fastapi）
-├── tools/                 # 核心脚本
-│   ├── tts_server.py      # 流式 TTS 服务（GSV 后端）：server / --bench / --compare / /demo
-│   ├── run_overnight_pipeline.sh
-│   ├── run_v3_pipeline.sh # v3 多语言训练管线（WSL）
-│   ├── prep_multilingual.py / gen_codeswitch.py / gen_multilingual.py / gen_multilingual_mix.py / assemble_multilingual.py
-│   ├── gen_v3.py          # v3 统一生成/测试（demo/emotions/combos/long/style）
-│   ├── tts_dialogue.py    # 桌宠对话格式 TTS（动作+标点停顿）
-│   ├── infer_emotions.py
-│   └── export_ckpt.py
-├── models/                # Git LFS
-│   ├── gpt_firefly_678orig-e15.ckpt
-│   ├── sovits_firefly_678orig_e10.pth
-│   ├── gpt_firefly_v3-e15.ckpt      # v3 多语言
-│   ├── sovits_firefly_v3_e{30,35,40,45,50}_cont.pth  # 本机 v3 候选
-│   ├── zihan/                # 梓涵独立模型与 voice.json（本机未跟踪）
-│   └── genie/firefly_678orig/   # 已弃用 ONNX
-├── reference_audio/       # 8 情绪原声参考（撒娇甜/生气已换新）
-├── docs/zihan_cn_training.md # 梓涵训练流程、状态入口与 API
-├── gsv_models/            # GSV 预训练模型（cnhubert/roberta/g2p/sv，~1.3GB，gitignore）
-├── GenieData/             # genie 残留数据（gitignore）
-├── output/                # 推理输出（bench/compare/stream，gitignore）
-└── .gitattributes         # LFS 规则
-```
-
----
-
-## 后续优化 TODO（保留原研究方向，尚不代表可用配置）
-
-### 1. 启用音色/风格解耦（spk ≠ prompt）
-
-当前 `tools/tts_server.py` 里 `spk_audio_path=ref, prompt_audio_path=ref` 俩填同一个文件，等于退化回"一个参考音频"，没用上 GSV-TTS-Lite 的音色/风格解耦。
-
-**优化方向**：把 `prompt_audio` 换成另一段（更夸张的情绪样本，甚至不同声线的情绪录音），`spk` 保持流萤 → 流萤声线 + 那段情绪。
-- `cache_spk_audio` / `cache_prompt_audio` 已分开缓存，只需在 `EMO` 表里给每个情绪拆出独立的 `(spk_file, spk_text)` 和 `(prompt_file, prompt_text)`。
-- **用途**：流萤原声里某情绪样本不够好时（README 提到撒娇甜换过 3 次才定、生气踩过 <3s 坑），可以借别人的高质量情绪录音套流萤声线，**扩情绪表现力而不用重训**。
-- 注意：`prompt_text` 必须与 `prompt_audio` 内容一致（曾踩坑）。
-
-### 2. 排查混合语言（中英日）丢字/跳过
-
-重训 s1/s2 后，混合语言文本（如包含日语的句子）会跳过日语段。需区分是 **g2p/文本前端** 问题还是 **GPT (s1)** 问题：
-
-- **先查 g2p**：用 `text_language="auto"` 时，短 JP 段可能被误判为 CN → 错误音素 → 模型"跳过"。给 `tts_server.py` 加一个调试入口，打印 g2p 对混合文本产出的音素序列，确认 JP 段是否被正确转写。
-- **GPT 丢字是已知问题**：官方 changelog 明确 V2Pro/V3"GPT 合成更稳定，重复漏字更少"；PR#457（2024.02）加 DPO 损失训练选项"通过构造负样本训练缓解 GPT 重复漏字问题"。我们用的是 V2ProPlus（较稳），若 g2p 输出正确仍丢字，考虑：开 DPO 训练、确保训练集含足够混合语言样本、s1 epoch 不要过低（欠训→注意力不稳→丢字）。
-- 短期 workaround：对混合文本按语种切分，分段合成再拼接，避免 auto-detect 在短段上误判。
-
-### 3. 性能调参候选（需独立基准）
-
-- `TTS(use_flash_attn=True)`：Windows 预编译 wheel 可参考 [lldacing/flash-attention-windows-wheel](https://huggingface.co/lldacing/flash-attention-windows-wheel)；当前环境未验证收益与兼容性，不预先承诺延迟改善。
-- `gpt_cache=[(1, 64), (1, 128)]`：CUDA Graph 静态缓存候选。当前服务没有显式传入这一参数，实际默认值取决于已安装引擎；先核对版本和基准再调参。
-- `sovits_cache` 调参（流式示例 `[50, 55]` = stream_chunk×2 + overlap）。
-
+- **给某个情绪换参考 / 新增情绪**：编辑 `voices/qwen3_voices.json`。情绪键要用 AiriLife 发的标签（平淡、活泼、温柔、撒娇甜、害羞、悲伤、惊讶、生气、紧张），`text` 必须和音频内容逐字一致，改完重启服务。
+- **为 Airi 设计专属声线**：
+  1. 在 `voices/qwen3_voice_prompts.json` 里写声线描述和场景台词；
+  2. 用 `tools/qwen/qwen3_voice_design.py` 出片，在 `index.html` 里试听挑选；
+  3. 把选定的一组移到 `models/airi/qwen_v1/`；
+  4. 在 `qwen3_voices.json` 里把 `firefly` 的参考换掉，或者新增一个音色并在 AiriLife 角色包里绑定。
+- **音色一致性检查**：`tools/qwen/qwen3_base_clone_check.py`，用 speaker encoder 的余弦相似度量化克隆漂移。
+- **重训 GSV**：训练脚本在 `tools/gsv_training/`，语料已移到 `archive/data/`，重训前先移回 `data/` 或改脚本路径。历程见 `docs/gsv_v2_history.md`。

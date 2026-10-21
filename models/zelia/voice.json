@@ -1,0 +1,87 @@
+{
+  "id": "zihan",
+  "label": "新海天中文",
+  "text_language": "zh",
+  "references": {
+    "平淡": {
+      "audio": "models/zelia/references/neutral.wav",
+      "text": "今天记得记住今天学到的东西，不要把这件事忘了。",
+      "language": "zh",
+      "teacher_cer": 0.0
+    },
+    "活泼": {
+      "audio": "models/zelia/references/happy.wav",
+      "text": "好耶！我们一起准备明天需要的东西，感觉今天一定会很顺利。",
+      "language": "zh",
+      "teacher_cer": 0.0
+    },
+    "温柔": {
+      "audio": "models/zelia/references/gentle.wav",
+      "text": "不用太着急，等心情放松一点，再为明天做好准备也没关系。",
+      "language": "zh",
+      "teacher_cer": 0.0
+    },
+    "撒娇甜": {
+      "audio": "models/zelia/references/teasing.wav",
+      "text": "你又又把同一句话念了一遍了对不对？好啦，我会帮你记着的。",
+      "language": "zh",
+      "teacher_cer": 0.0
+    },
+    "害羞": {
+      "audio": "models/zelia/references/shy.wav",
+      "text": "如果不会打扰你，能不能答应我好好休息？我有一点期待。",
+      "language": "zh",
+      "teacher_cer": 0.0
+    },
+    "惊讶": {
+      "audio": "models/zelia/references/surprised.wav",
+      "text": "哇，原来你已经把完整的计划写好了！真是让我刮目相看。",
+      "language": "zh",
+      "teacher_cer": 0.0
+    },
+    "生气": {
+      "audio": "models/zelia/references/angry.wav",
+      "text": "你怎么又把所有事情都憋在心里？这次我真的要认真提醒你了。",
+      "language": "zh",
+      "teacher_cer": 0.0
+    },
+    "悲伤": {
+      "audio": "models/zelia/references/sad.wav",
+      "text": "今天觉得今天有一点疲惫也没关系，我们明天再慢慢尝试。",
+      "language": "zh",
+      "teacher_cer": 0.0
+    }
+  },
+  "gpt": "models/zelia/gsv/zihan_cn_20261001-e5.ckpt",
+  "sovits": "models/zelia/gsv/zihan_cn_20261001_e10_s5470.pth",
+  "selected_checkpoint": "s1e5_s2e10",
+  "scores": {
+    "s1e5_s2e10": {
+      "mean_cer": 0.009523809523809523,
+      "passed": 10,
+      "mean_jp_speaker_similarity": 0.7501953125
+    },
+    "s1e10_s2e10": {
+      "mean_cer": 0.0047619047619047615,
+      "passed": 10,
+      "mean_jp_speaker_similarity": 0.747900390625
+    },
+    "s1e15_s2e10": {
+      "mean_cer": 0.031010452961672475,
+      "passed": 9,
+      "mean_jp_speaker_similarity": 0.738330078125
+    },
+    "s1e10_s2e20": {
+      "mean_cer": 0.0047619047619047615,
+      "passed": 10,
+      "mean_jp_speaker_similarity": 0.74228515625
+    },
+    "s1e15_s2e20": {
+      "mean_cer": 0.033449477351916376,
+      "passed": 9,
+      "mean_jp_speaker_similarity": 0.744140625
+    }
+  },
+  "subjective_audition": "pending",
+  "automatic_gate": "Chinese ASR + acoustic sanity; SV similarity tie-break is not human likeness acceptance"
+}

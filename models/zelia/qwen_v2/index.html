@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>Qwen3-TTS VoiceDesign · 梓涵 v2</title>
+<style>
+ body { font-family: -apple-system, "Microsoft YaHei", sans-serif; margin: 24px; background:#faf8f6; color:#2b2b2b; }
+ h1 { font-size: 20px; }
+ table { border-collapse: collapse; width: 100%; background:#fff; }
+ th, td { border-bottom:1px solid #eee; padding:8px 10px; text-align:left; vertical-align:top; font-size:14px; }
+ th { background:#f0ece8; }
+ audio { width: 260px; }
+ details { margin: 12px 0 20px; }
+ pre { white-space: pre-wrap; background:#fff; padding:12px; border:1px solid #eee; font-size:12px; }
+ small { color:#888; }
+</style></head><body>
+<h1>Qwen3-TTS VoiceDesign · 梓涵 v2</h1>
+<details><summary>音色提示词（instruct）</summary><pre>A natural Mandarin Chinese voice of a 16 to 17-year-old teenage girl. Clear, soft, and delicate, with a moderately high pitch and a light yet gently grounded vocal texture. Her timbre is youthful and refined, with a subtle airy quality, smooth midrange resonance, and a faint natural warmth. The voice has a quiet, reserved, and introspective character, with understated sweetness rather than bright, bubbly cuteness. Slightly restrained vocal energy, gentle consonants, and soft, controlled endings give her speech a calm, thoughtful presence. Natural Mandarin articulation, balanced vocal weight, and an unhurried, conversational cadence. The overall impression is of a gentle, somewhat introverted high school girl whose voice feels youthful but composed, delicate without sounding childish, and softly expressive without sounding mature or theatrical.</pre></details>
+<table>
+<thead><tr><th>场景</th><th>台词</th><th>音频时长</th><th>生成耗时</th><th>速度</th><th>试听</th></tr></thead>
+<tbody>
+<tr>
+  <td>daily<br><small>日常问候｜温柔、亲近</small></td>
+  <td>嗯？你回来啦。今天好像有点晚呢……我刚刚还在想，你是不是又忙着写代码，忘记时间了。</td>
+  <td>9.52s</td>
+  <td>31.92s</td>
+  <td>RTF 3.35</td>
+  <td><audio controls preload="none" src="daily_t1.wav"></audio></td>
+</tr><tr>
+  <td>shy<br><small>害羞与心动｜轻羞、细腻</small></td>
+  <td>别、别突然靠这么近啦……我这不是还没准备好嘛。真是的，被你这样看着，我会不知道说什么好的。</td>
+  <td>10.32s</td>
+  <td>40.06s</td>
+  <td>RTF 3.88</td>
+  <td><audio controls preload="none" src="shy_t1.wav"></audio></td>
+</tr><tr>
+  <td>happy<br><small>开心分享｜明亮、惊喜</small></td>
+  <td>你猜我刚刚发现什么？楼下新开了一家很小的书店，里面居然有我一直想找的那本旧诗集！</td>
+  <td>7.92s</td>
+  <td>100.03s</td>
+  <td>RTF 12.63</td>
+  <td><audio controls preload="none" src="happy_t1.wav"></audio></td>
+</tr><tr>
+  <td>tease<br><small>俏皮吐槽｜熟悉、狡黠</small></td>
+  <td>又熬夜写代码哦？黑眼圈都快比代码行数多了呢。快去睡，不然明天又要我提醒你三次才肯起床。</td>
+  <td>11.28s</td>
+  <td>44.44s</td>
+  <td>RTF 3.94</td>
+  <td><audio controls preload="none" src="tease_t1.wav"></audio></td>
+</tr><tr>
+  <td>comfort<br><small>认真安慰｜沉静、可靠</small></td>
+  <td>今天辛苦了。不用急着说什么，就这样坐一会儿也好。我在这儿，慢慢来，不用一个人扛着。</td>
+  <td>9.60s</td>
+  <td>27.60s</td>
+  <td>RTF 2.88</td>
+  <td><audio controls preload="none" src="comfort_t1.wav"></audio></td>
+</tr><tr>
+  <td>explain<br><small>自然解释｜清楚、专注</small></td>
+  <td>这个函数的作用，是把输入的句子拆成更短的片段，再一段一段送进去合成，这样开口会更快。</td>
+  <td>8.80s</td>
+  <td>27.84s</td>
+  <td>RTF 3.16</td>
+  <td><audio controls preload="none" src="explain_t1.wav"></audio></td>
+</tr><tr>
+  <td>bedtime<br><small>晚安陪伴｜软糯、亲密</small></td>
+  <td>哥哥听好啦～今晚就用我的声音陪你入睡。晚安啦，我最喜欢的哥哥，梦里也要梦到我哦。明天见，好梦～</td>
+  <td>11.52s</td>
+  <td>33.35s</td>
+  <td>RTF 2.90</td>
+  <td><audio controls preload="none" src="bedtime_t1.wav"></audio></td>
+</tr>
+</tbody></table>
+<p><small>RTF = 生成耗时 / 音频时长，小于 1 表示比实时快。此处是离线整句生成，不代表 AiriLife 流式首包延迟。</small></p>
+</body></html>
