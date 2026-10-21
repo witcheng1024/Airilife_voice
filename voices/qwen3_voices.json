@@ -14,21 +14,17 @@
           "audio": "models/zelia/qwen_v2/emotions/happy.wav",
           "text": "嗯？你回来啦。今天好像有点晚呢……我刚刚还在想，你是不是又忙着写代码，忘记时间了。"
         },
-        "温柔": {
-          "audio": "models/zelia/qwen_v2/emotions/gentle.wav",
-          "text": "哥哥听好啦～今晚就用我的声音陪你入睡。晚安啦，我最喜欢的哥哥，梦里也要梦到我哦。明天见，好梦～"
-        },
         "难过": {
           "audio": "models/zelia/qwen_v2/emotions/sad.wav",
           "text": "嗯……我知道你最近很忙，可是我等了你一整个晚上。没关系的，我只是……有一点点难过而已。"
         },
+        "生气": {
+          "audio": "models/zelia/qwen_v2/emotions/angry.wav",
+          "text": "哼！又熬到这么晚！说好的十二点就睡，你根本就没把我的话放在心上嘛！"
+        },
         "惊讶": {
           "audio": "models/zelia/qwen_v2/emotions/surprised.wav",
           "text": "诶？等一下，这个是你自己做的吗？怎么会这么好看！你什么时候偷偷学会的呀！"
-        },
-        "紧张": {
-          "audio": "models/zelia/qwen_v2/emotions/nervous.wav",
-          "text": "等、等一下！电脑怎么突然这么烫，还一直在响，是不是要坏了？你快过来看看呀！"
         },
         "害羞": {
           "audio": "models/zelia/qwen_v2/emotions/shy.wav",
@@ -38,13 +34,17 @@
           "audio": "models/zelia/qwen_v2/emotions/tired.wav",
           "text": "唔……几点了呀……我好困，眼睛都睁不开了。你也早点睡嘛，晚安……"
         },
+        "温柔": {
+          "audio": "models/zelia/qwen_v2/emotions/gentle.wav",
+          "text": "哥哥听好啦～今晚就用我的声音陪你入睡。晚安啦，我最喜欢的哥哥，梦里也要梦到我哦。明天见，好梦～"
+        },
+        "紧张": {
+          "audio": "models/zelia/qwen_v2/emotions/nervous.wav",
+          "text": "等、等一下！电脑怎么突然这么烫，还一直在响，是不是要坏了？你快过来看看呀！"
+        },
         "困惑": {
           "audio": "models/zelia/qwen_v2/emotions/confused.wav",
           "text": "嗯？等一下，你刚才说的是哪个文件呀？我怎么没太听明白……是这个吗？"
-        },
-        "生气": {
-          "audio": "models/zelia/qwen_v2/emotions/angry.wav",
-          "text": "哼！又熬到这么晚！说好的十二点就睡，你根本就没把我的话放在心上嘛！"
         }
       },
       "_comment": "M53-07（2026-10-22）：十种情绪各用一段 VoiceDesign 参考（同一 zihan_v2 instruct），标签与 AiriLife 模型情绪首部同名；来源与选择记录见 models/zelia/qwen_v2/emotions/emotions.json。不使用 instruct。"
