@@ -1,0 +1,106 @@
+"""单参考 + 情绪指令试听（AiriLife M53-07，用户 2026-10-21 定：0.6B、bedtime 作唯一参考、情绪靠指令）。
+
+faster-qwen3-tts 的 Base 克隆接口接受 instruct（作为 user 轮前置；ICL 模式下可用，
+x-vector 模式不可靠）。官方 Base 未专门训练指令，是否听从只能人耳判断。
+本脚本按情绪出「无指令 / 有指令」对照，各两遍，不打分。
+
+用法（conda env qwen3-tts-fast，先停掉常驻服务腾显存）：
+    python tools/qwen/instruct_emotion_grid.py
+"""
+
+from __future__ import annotations
+
+import argparse
+import html
+import json
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+MODEL_DIR = ROOT / "models" / "base" / "qwen3-tts" / "Qwen3-TTS-12Hz-0.6B-Base"
+PROMPTS_FILE = ROOT / "voices" / "qwen3_voice_prompts.json"
+REF_SCENE = "bedtime"
+OUT_ROOT = ROOT / "output" / "instruct_grid"
+
+TEMPERATURE = 0.9
+TOP_K = 50
+CHUNK_SIZE = 4
+TAKES = 2
+
+# 情绪键与 AiriLife 发送的标签一致；台词与情绪匹配，便于听指令是否起作用
+EMOTIONS = [
+    ("平淡", "用自然、平静的日常语气说。", "嗯，文件我已经帮你放到桌面上了，记得看一下。"),
+    ("活泼", "用开心、轻快、充满活力的语气说。", "真的吗！那周末我们就去那家新开的甜品店吧！"),
+    ("温柔", "用温柔、轻声、安抚人的语气说。", "没关系的，慢慢来，我会一直在这里陪着你。"),
+    ("撒娇甜", "用撒娇、甜甜的、有点黏人的语气说。", "哼，你都好久没理我了，今天要多陪我一会儿嘛。"),
+    ("害羞", "用害羞、小声、有点不好意思的语气说。", "那、那个……你一直这样看着我，我会不好意思的啦。"),
+    ("悲伤", "用低落、难过、有点委屈的语气说，语速放慢。", "嗯……我知道你很忙。只是今天，有一点点想你了。"),
+    ("惊讶", "用非常惊讶、意外的语气说。", "诶？你什么时候回来的？我怎么一点都没听见！"),
+    ("生气", "用生气、带着责备的语气说，语气加重。", "你又熬到三点才睡！说了多少次了，身体是你自己的呀！"),
+    ("紧张", "用紧张、着急、语速稍快的语气说。", "快、快看一下，电脑怎么突然这么烫，是不是要坏了？"),
+]
+
+
+def main() -> int:
+    import numpy as np
+    import soundfile as sf
+    import torch
+    from faster_qwen3_tts import FasterQwen3TTS
+
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--run-name", default=None)
+    args = ap.parse_args()
+
+    scene = json.loads(PROMPTS_FILE.read_text(encoding="utf-8"))["zihan_v2"]["scenes"][REF_SCENE]
+    ref_wav = ROOT / "models" / "zelia" / "qwen_v2" / f"{REF_SCENE}_t1.wav"
+    run_dir = OUT_ROOT / (args.run_name or time.strftime("%Y%m%d_%H%M%S"))
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    model = FasterQwen3TTS.from_pretrained(
+        str(MODEL_DIR), device="cuda", dtype=torch.bfloat16, backend="torch", local_files_only=True
+    )
+    model.warmup()
+
+    records = []
+    for emotion, instruct, text in EMOTIONS:
+        for variant, inst in (("plain", None), ("instruct", instruct)):
+            for take in range(1, TAKES + 1):
+                chunks, sr = [], 24000
+                for audio, chunk_sr, _t in model.generate_voice_clone_streaming(
+                    text=text, language="Chinese", ref_audio=str(ref_wav), ref_text=scene["text"],
+                    chunk_size=CHUNK_SIZE, temperature=TEMPERATURE, top_k=TOP_K, instruct=inst,
+                ):
+                    sr = int(chunk_sr)
+                    chunks.append(np.asarray(audio, dtype=np.float32).reshape(-1))
+                name = f"{emotion}_{variant}_{take}.wav"
+                sf.write(str(run_dir / name), np.concatenate(chunks), sr)
+                records.append({"emotion": emotion, "variant": variant, "take": take, "instruct": inst, "text": text, "file": name})
+                print(name, flush=True)
+
+    rows = []
+    for emotion, instruct, text in EMOTIONS:
+        cell = lambda v: "".join(
+            f"<audio controls preload='none' src='{html.escape(f'{emotion}_{v}_{t}.wav')}'></audio>" for t in range(1, TAKES + 1)
+        )
+        rows.append(
+            f"<tr><td><b>{emotion}</b><br><small>{html.escape(text)}</small></td>"
+            f"<td>{cell('plain')}</td><td>{cell('instruct')}<br><small>{html.escape(instruct)}</small></td></tr>"
+        )
+    page = f"""<!doctype html><meta charset="utf-8"><title>情绪指令试听</title>
+<style>body{{font-family:system-ui,sans-serif;margin:16px}}table{{border-collapse:collapse}}
+td,th{{border:1px solid #ccc;padding:6px;vertical-align:top;font-size:13px}}audio{{width:200px;display:block;margin:2px 0}}</style>
+<h1>梓涵 v2：bedtime 单参考 + 情绪指令（0.6B）</h1>
+<p>参考原片：<audio controls src="../../../{ref_wav.relative_to(ROOT).as_posix()}"></audio></p>
+<p>每行同一句台词：左边不带指令，右边带指令，各两遍。听两件事：①还是不是梓涵；②右边的情绪是否明显更贴。</p>
+<table><tr><th>情绪 / 台词</th><th>不带指令</th><th>带指令</th></tr>{''.join(rows)}</table>"""
+    (run_dir / "index.html").write_text(page, encoding="utf-8")
+    (run_dir / "manifest.json").write_text(json.dumps({
+        "ref": ref_wav.relative_to(ROOT).as_posix(), "ref_text": scene["text"], "model": MODEL_DIR.name,
+        "params": {"temperature": TEMPERATURE, "top_k": TOP_K, "chunk_size": CHUNK_SIZE, "mode": "icl-streaming"},
+        "records": records}, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\n试听页：{run_dir / 'index.html'}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
