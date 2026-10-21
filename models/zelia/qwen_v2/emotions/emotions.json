@@ -67,9 +67,9 @@
     "angry": {
       "label": "生气",
       "file": "angry.wav",
-      "source": "output/qwen3_voice_design/zihan_v2/20261022_angry/angry2_t1.wav",
-      "scene": "angry2",
-      "text": "你又偷吃我的布丁！那是我留到晚上才舍得吃的！哼，我生气了，今天都不跟你说话了！"
+      "source": "output/qwen3_voice_design/zihan_v2/20261022_angry/angry_t2.wav",
+      "scene": "angry",
+      "text": "哼！又熬到这么晚！说好的十二点就睡，你根本就没把我的话放在心上嘛！"
     }
   }
 }
