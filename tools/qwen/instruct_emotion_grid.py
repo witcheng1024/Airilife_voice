@@ -71,10 +71,12 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run-name", default=None)
     ap.add_argument("--variants", action="store_true", help="只跑 VARIANTS 里的情绪，每版指令一行")
+    ap.add_argument("--ref", default=REF_SCENE, help="参考片场景 key（qwen_v2/<key>_t1.wav）")
+    ap.add_argument("--emotions", nargs="+", default=None, help="只跑指定情绪")
     args = ap.parse_args()
 
-    scene = json.loads(PROMPTS_FILE.read_text(encoding="utf-8"))["zihan_v2"]["scenes"][REF_SCENE]
-    ref_wav = ROOT / "models" / "zelia" / "qwen_v2" / f"{REF_SCENE}_t1.wav"
+    scene = json.loads(PROMPTS_FILE.read_text(encoding="utf-8"))["zihan_v2"]["scenes"][args.ref]
+    ref_wav = ROOT / "models" / "zelia" / "qwen_v2" / f"{args.ref}_t1.wav"
     run_dir = OUT_ROOT / (args.run_name or time.strftime("%Y%m%d_%H%M%S"))
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -88,6 +90,8 @@ def main() -> int:
         plan = [(emotion, [("plain", None), *VARIANTS[emotion]]) for emotion in VARIANTS]
     else:
         plan = [(emotion, [("plain", None), ("instruct", instruct)]) for emotion, instruct, _t in EMOTIONS]
+    if args.emotions:
+        plan = [p for p in plan if p[0] in args.emotions]
 
     records = []
     for emotion, variants in plan:
@@ -119,7 +123,7 @@ def main() -> int:
     page = f"""<!doctype html><meta charset="utf-8"><title>情绪指令试听</title>
 <style>body{{font-family:system-ui,sans-serif;margin:16px}}table{{border-collapse:collapse}}
 td,th{{border:1px solid #ccc;padding:6px;vertical-align:top;font-size:13px}}audio{{width:200px;display:block;margin:2px 0}}</style>
-<h1>梓涵 v2：bedtime 单参考 + 情绪指令（0.6B）</h1>
+<h1>梓涵 v2：{args.ref} 参考 + 情绪指令（0.6B）</h1>
 <p>参考原片：<audio controls src="../../../{ref_wav.relative_to(ROOT).as_posix()}"></audio></p>
 <p>每行同一句台词：左边不带指令，右边带指令，各两遍。听两件事：①还是不是梓涵；②右边的情绪是否明显更贴。</p>
 <table><tr><th>写法</th><th>两遍</th></tr>{''.join(rows)}</table>"""
