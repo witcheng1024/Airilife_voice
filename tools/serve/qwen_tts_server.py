@@ -42,6 +42,7 @@ PORT = 9880
 TEMPERATURE = 0.9
 TOP_K = 50
 WARM_TEXT = '嗯。'
+NEUTRAL_LABELS = ('普通', '平淡')
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 logger = logging.getLogger('qwen_tts')
@@ -238,6 +239,12 @@ def create_app():
         if not is_ready(voice):
             raise HTTPException(status_code=503, detail=f'音色尚未就绪: {voice_id}')
         reference = voice['references'].get(req.emotion)
+        if reference is None:
+            # 调用方拿不到能力列表时会发旧标签；未知情绪回落中性（新标签「普通」/ 旧标签「平淡」）
+            fallback = next((label for label in NEUTRAL_LABELS if label in voice['references']), None)
+            if fallback is not None:
+                logger.info('音色 %s 无情绪 %s，本次使用 %s', voice['id'], req.emotion, fallback)
+                reference = voice['references'][fallback]
         if reference is None:
             available = '/'.join(voice['references'])
             raise HTTPException(status_code=400, detail=f'未知情绪: {req.emotion}，可选 {available}')

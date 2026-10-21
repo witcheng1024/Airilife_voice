@@ -6,40 +6,85 @@
       "label": "梓涵",
       "language": "Chinese",
       "references": {
-        "平淡": {
-          "audio": "models/zelia/qwen_v2/daily_t1.wav",
-          "text": "嗯？你回来啦。今天好像有点晚呢……我刚刚还在想，你是不是又忙着写代码，忘记时间了。"
-        },
-        "活泼": {
-          "audio": "models/zelia/qwen_v2/happy_t1.wav",
+        "普通": {
+          "audio": "models/zelia/qwen_v2/emotions/neutral.wav",
           "text": "你猜我刚刚发现什么？楼下新开了一家很小的书店，里面居然有我一直想找的那本旧诗集！"
         },
-        "温柔": {
-          "audio": "models/zelia/qwen_v2/comfort_t1.wav",
-          "text": "今天辛苦了。不用急着说什么，就这样坐一会儿也好。我在这儿，慢慢来，不用一个人扛着。"
+        "高兴": {
+          "audio": "models/zelia/qwen_v2/emotions/happy.wav",
+          "text": "嗯？你回来啦。今天好像有点晚呢……我刚刚还在想，你是不是又忙着写代码，忘记时间了。"
         },
-        "撒娇甜": {
-          "audio": "models/zelia/qwen_v2/tease_t1.wav",
-          "text": "又熬夜写代码哦？黑眼圈都快比代码行数多了呢。快去睡，不然明天又要我提醒你三次才肯起床。"
+        "温柔": {
+          "audio": "models/zelia/qwen_v2/emotions/gentle.wav",
+          "text": "哥哥听好啦～今晚就用我的声音陪你入睡。晚安啦，我最喜欢的哥哥，梦里也要梦到我哦。明天见，好梦～"
+        },
+        "难过": {
+          "audio": "models/zelia/qwen_v2/emotions/sad.wav",
+          "text": "嗯……我知道你最近很忙，可是我等了你一整个晚上。没关系的，我只是……有一点点难过而已。"
+        },
+        "惊讶": {
+          "audio": "models/zelia/qwen_v2/emotions/surprised.wav",
+          "text": "诶？等一下，这个是你自己做的吗？怎么会这么好看！你什么时候偷偷学会的呀！"
+        },
+        "紧张": {
+          "audio": "models/zelia/qwen_v2/emotions/nervous.wav",
+          "text": "等、等一下！电脑怎么突然这么烫，还一直在响，是不是要坏了？你快过来看看呀！"
         },
         "害羞": {
-          "audio": "models/zelia/qwen_v2/shy_t1.wav",
-          "text": "别、别突然靠这么近啦……我这不是还没准备好嘛。真是的，被你这样看着，我会不知道说什么好的。"
+          "audio": "models/zelia/qwen_v2/emotions/shy.wav",
+          "text": "诶？你、你突然夸我干嘛啦……我才没有脸红呢，是房间太热了而已。"
+        },
+        "困倦": {
+          "audio": "models/zelia/qwen_v2/emotions/tired.wav",
+          "text": "唔……几点了呀……我好困，眼睛都睁不开了。你也早点睡嘛，晚安……"
+        },
+        "困惑": {
+          "audio": "models/zelia/qwen_v2/emotions/confused.wav",
+          "text": "嗯？等一下，你刚才说的是哪个文件呀？我怎么没太听明白……是这个吗？"
+        },
+        "生气": {
+          "audio": "models/zelia/qwen_v2/emotions/angry.wav",
+          "text": "哼！又熬到这么晚！说好的十二点就睡，你根本就没把我的话放在心上嘛！"
         }
-      }
+      },
+      "_comment": "M53-07（2026-10-22）：十种情绪各用一段 VoiceDesign 参考（同一 zihan_v2 instruct），标签与 AiriLife 模型情绪首部同名；来源与选择记录见 models/zelia/qwen_v2/emotions/emotions.json。不使用 instruct。"
     },
     "firefly": {
       "label": "流萤（临时克隆）",
       "language": "Chinese",
       "references": {
-        "平淡": { "audio": "models/airi/references/平淡.wav", "text": "我叫流萤，是鸢尾花家系的艺者。" },
-        "活泼": { "audio": "models/airi/references/活泼.wav", "text": "好啦！看上去真不错，你好上相呀。" },
-        "撒娇甜": { "audio": "models/airi/references/撒娇甜.wav", "text": "我最喜欢这家店的橡木蛋糕卷，每天都要吃一个。" },
-        "温柔": { "audio": "models/airi/references/温柔.wav", "text": "这里是游客不会踏足的拓荒地，所以不像市中心那样热闹…但我很喜欢这种僻静的气氛。" },
-        "悲伤": { "audio": "models/airi/references/悲伤.wav", "text": "嗯，是我不好。对不起。" },
-        "惊讶": { "audio": "models/airi/references/惊讶.wav", "text": "真的吗？看来…卡芙卡教给我的没错。" },
-        "生气": { "audio": "models/airi/references/生气.wav", "text": "绝对不行，难道你忘了吗？作为星核猎手，我有一项不惜一切代价的「零点任务」——" },
-        "紧张": { "audio": "models/airi/references/紧张.wav", "text": "小心，更多怪物进来了！准备开火！" }
+        "平淡": {
+          "audio": "models/airi/references/平淡.wav",
+          "text": "我叫流萤，是鸢尾花家系的艺者。"
+        },
+        "活泼": {
+          "audio": "models/airi/references/活泼.wav",
+          "text": "好啦！看上去真不错，你好上相呀。"
+        },
+        "撒娇甜": {
+          "audio": "models/airi/references/撒娇甜.wav",
+          "text": "我最喜欢这家店的橡木蛋糕卷，每天都要吃一个。"
+        },
+        "温柔": {
+          "audio": "models/airi/references/温柔.wav",
+          "text": "这里是游客不会踏足的拓荒地，所以不像市中心那样热闹…但我很喜欢这种僻静的气氛。"
+        },
+        "悲伤": {
+          "audio": "models/airi/references/悲伤.wav",
+          "text": "嗯，是我不好。对不起。"
+        },
+        "惊讶": {
+          "audio": "models/airi/references/惊讶.wav",
+          "text": "真的吗？看来…卡芙卡教给我的没错。"
+        },
+        "生气": {
+          "audio": "models/airi/references/生气.wav",
+          "text": "绝对不行，难道你忘了吗？作为星核猎手，我有一项不惜一切代价的「零点任务」——"
+        },
+        "紧张": {
+          "audio": "models/airi/references/紧张.wav",
+          "text": "小心，更多怪物进来了！准备开火！"
+        }
       }
     }
   }
