@@ -104,10 +104,12 @@ python tools/qwen/reference_listening_grid.py --models 0.6b   # 需要时：参�
 
 ### 6. 上线
 
-1. `python tools/qwen/promote_emotions.py --dest models/airi/qwen_v1 --register airi --label Airi`：把定稿按协议顺序写进 `voices/qwen3_voices.json`（会整块替换该音色的 `references`）。
-2. 重启服务，检查 `GET /api/voices`。未知情绪会回落到「普通」或「平淡」。
-3. AiriLife 角色包的 `voice.speaker` 绑定这个音色 ID。
-4. 提交：母版 wav、`emotions.json`、`qwen3_voices.json`。`output/` 不入库。
+2026-10-26 起 TTS 服务和配方都在 AiriLife 里（M69），本仓库的 `tools/serve/` 只用于本地试听，AiriLife 不再依赖它。
+
+1. 本地试听（可选）：`python tools/qwen/promote_emotions.py --dest models/airi/qwen_v1 --register airi --label Airi` 写进 `voices/qwen3_voices.json`，用 `tools/serve/qwen_tts_server.py` 检查 `GET /api/voices`。
+2. 正式上线：把 `emotions/*.wav` 原样复制到 AiriLife `voice/recipes/<角色>/qwen3_tts/`，按 `voice/recipes/zelia/qwen3_tts.json` 的格式写 `qwen3_tts.json`（text 从 `emotions.json` 逐字复制），角色卡 `agent.json` 的 `voice.qwenSpeaker` 绑定音色 ID；跑 `voice/scripts/verify_recipes.py`。
+3. 缺的情绪不必补齐：AiriLife 提示词只列音色有的情绪，合成时遇到没有的情绪按「普通」。
+4. 本仓库提交：母版 wav、`emotions.json`、`qwen3_voices.json`。`output/` 不入库。
 
 ## 三、Airi v1 声线描述
 
