@@ -38,6 +38,8 @@ docs/             qwen3_tts_local.md（Qwen 部署细节）、gsv_v2_history.md�
 archive/          不再使用但保留：未选用的训练轮次、训练语料（不入库）
 ```
 
+**找声音**：线上在用的定稿只在 `models/<角色>/qwen_vN/emotions/`，打开里面的 `index.html` 就能试听；`output/` 只是候选草稿。草稿进定稿只走 `tools/qwen/promote_emotions.py`，流程见 `docs/voice_design_workflow.md`。
+
 整理约定：每个角色一个目录，放这个角色专属的权重、参考音频和定稿母版；多个角色共用的模型放 `models/base/`；试听、基准等临时产物写到 `output/`（不入库，可随时删）；不再使用但还想留着的放 `archive/`。
 
 ## 启动服务
@@ -82,7 +84,7 @@ RTX 4070 Laptop 8 GB 上，0.6B Base + ICL，chunk 4：
 ## 常见维护
 
 - **给某个情绪换参考 / 新增情绪**：编辑 `voices/qwen3_voices.json`。情绪键要用 AiriLife 发的标签（平淡、活泼、温柔、撒娇甜、害羞、悲伤、惊讶、生气、紧张），`text` 必须和音频内容逐字一致，改完重启服务。
-- **为 Airi 设计专属声线**：
+- **为 Airi 设计专属声线**（完整流程与梓涵经验见 `docs/voice_design_workflow.md`，Airi v1 描述已写入 `airi_v1`）：
   1. 在 `voices/qwen3_voice_prompts.json` 里写声线描述和场景台词；
   2. 用 `tools/qwen/qwen3_voice_design.py` 出片，在 `index.html` 里试听挑选；
   3. 把选定的一组移到 `models/airi/qwen_v1/`；

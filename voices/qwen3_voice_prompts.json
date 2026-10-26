@@ -36,5 +36,51 @@
       "sleepy": {"label": "困倦迷糊", "hint": "困得睁不开眼、慢、含糊、打哈欠", "text": "唔……几点了呀……我好困，眼睛都睁不开了。你也早点睡嘛，晚安……"},
       "confused": {"label": "困惑不解", "hint": "疑惑、歪头、语调上扬又犹豫", "text": "嗯？等一下，你刚才说的是哪个文件呀？我怎么没太听明白……是这个吗？"}
     }
+  },
+  "airi_v1": {
+    "label": "Airi v1",
+    "role": "15-16 岁少女，明亮活泼、亲昵、带点小坏（v1：用户 2026-10-26 给定的声线描述，原文不改；场景台词与 zihan_v2 完全相同，照搬梓涵工作流）",
+    "instruct": "A bright, lively teenage girl's voice, around 15–16 years old, with a naturally youthful mid-to-high pitch and a clear, light, pleasantly resonant timbre. Her voice is fresh, warm, and slightly sweet, with a gentle sparkle and a natural smiling quality. The vocal texture is smooth and agile, retaining enough softness and warmth to avoid sounding sharp, thin, or shrill. She has a cheerful, affectionate, and slightly mischievous personality. Her speech feels spontaneous and conversational, with lively but natural pitch variations, expressive intonation, and a lightly bouncy rhythm. She can shift naturally between playful excitement, gentle teasing, sincere warmth, and softer, intimate moments without losing her recognizable vocal identity. The overall impression is youthful, charming, energetic, and emotionally vivid, avoiding exaggerated anime cuteness, childish squeaking, artificial sweetness, excessive nasality, or theatrical overacting.",
+    "scenes": {
+      "daily": {"label": "日常问候", "hint": "温柔、亲近", "text": "嗯？你回来啦。今天好像有点晚呢……我刚刚还在想，你是不是又忙着写代码，忘记时间了。"},
+      "shy": {"label": "害羞与心动", "hint": "轻羞、细腻", "text": "别、别突然靠这么近啦……我这不是还没准备好嘛。真是的，被你这样看着，我会不知道说什么好的。"},
+      "happy": {"label": "开心分享", "hint": "明亮、惊喜", "text": "你猜我刚刚发现什么？楼下新开了一家很小的书店，里面居然有我一直想找的那本旧诗集！"},
+      "tease": {"label": "俏皮吐槽", "hint": "熟悉、狡黠", "text": "又熬夜写代码哦？黑眼圈都快比代码行数多了呢。快去睡，不然明天又要我提醒你三次才肯起床。"},
+      "comfort": {"label": "认真安慰", "hint": "沉静、可靠", "text": "今天辛苦了。不用急着说什么，就这样坐一会儿也好。我在这儿，慢慢来，不用一个人扛着。"},
+      "explain": {"label": "自然解释", "hint": "清楚、专注", "text": "这个函数的作用，是把输入的句子拆成更短的片段，再一段一段送进去合成，这样开口会更快。"},
+      "bedtime": {"label": "晚安陪伴", "hint": "软糯、亲密", "text": "哥哥听好啦～今晚就用我的声音陪你入睡。晚安啦，我最喜欢的哥哥，梦里也要梦到我哦。明天见，好梦～"},
+      "sad": {"label": "难过委屈", "hint": "低落、轻声、带点哽咽", "text": "嗯……我知道你最近很忙，可是我等了你一整个晚上。没关系的，我只是……有一点点难过而已。"},
+      "surprised": {"label": "惊讶意外", "hint": "意外、上扬、睁大眼睛的语气", "text": "诶？等一下，这个是你自己做的吗？怎么会这么好看！你什么时候偷偷学会的呀！"},
+      "angry": {"label": "嘟嘴生气", "hint": "气鼓鼓的可爱抱怨，全程生气不转折，不是真发火", "text": "哼！又熬到这么晚！说好的十二点就睡，你根本就没把我的话放在心上嘛！"},
+      "angry2": {"label": "嘟嘴生气", "hint": "气鼓鼓的可爱抱怨，全程生气不转折，不是真发火", "text": "你又偷吃我的布丁！那是我留到晚上才舍得吃的！哼，我生气了，今天都不跟你说话了！"},
+      "nervous": {"label": "紧张着急", "hint": "语速快、慌乱、有点结巴", "text": "等、等一下！电脑怎么突然这么烫，还一直在响，是不是要坏了？你快过来看看呀！"},
+      "shy2": {"label": "害羞脸红", "hint": "小声、慌乱、不好意思，嘴硬", "text": "诶？你、你突然夸我干嘛啦……我才没有脸红呢，是房间太热了而已。"},
+      "gentle": {"label": "温柔照顾", "hint": "轻柔、耐心、安心", "text": "累了吧？过来坐一会儿，我给你倒了杯热水。今天的事不用急着想，先好好休息。"},
+      "sleepy": {"label": "困倦迷糊", "hint": "困得睁不开眼、慢、含糊、打哈欠", "text": "唔……几点了呀……我好困，眼睛都睁不开了。你也早点睡嘛，晚安……"},
+      "confused": {"label": "困惑不解", "hint": "疑惑、歪头、语调上扬又犹豫", "text": "嗯？等一下，你刚才说的是哪个文件呀？我怎么没太听明白……是这个吗？"}
+    }
+  },
+  "airi_v2": {
+    "label": "Airi v2",
+    "role": "15-16 岁少女，明亮亲昵、带点小坏（v2：按 zihan_v2 描述的写法改写——开头写明 Mandarin Chinese、基调放松不强制带笑，让难过/困倦/软糯能出来；场景台词与 zihan_v2 完全相同）",
+    "instruct": "A natural Mandarin Chinese voice of a 15 to 16-year-old teenage girl. Clear, light, and fresh, with a naturally youthful mid-to-high pitch and a smooth, pleasantly resonant vocal texture. Her timbre is bright yet soft, with a gentle sparkle, clean midrange resonance, and a natural warmth, never sharp, thin, or shrill. The voice has an affectionate, lively, and slightly mischievous character, but her baseline delivery is relaxed and conversational rather than constantly cheerful, so she can sound genuinely sad, sleepy, or softly tender when the words call for it. Natural Mandarin articulation, balanced vocal energy, and expressive yet unforced intonation. The overall impression is of a charming, warm-hearted teenage girl whose voice feels youthful and vivid, sweet without sounding childish, avoiding exaggerated anime cuteness, excessive nasality, or theatrical overacting.",
+    "scenes": {
+      "daily": {"label": "日常问候", "hint": "温柔、亲近", "text": "嗯？你回来啦。今天好像有点晚呢……我刚刚还在想，你是不是又忙着写代码，忘记时间了。"},
+      "shy": {"label": "害羞与心动", "hint": "轻羞、细腻", "text": "别、别突然靠这么近啦……我这不是还没准备好嘛。真是的，被你这样看着，我会不知道说什么好的。"},
+      "happy": {"label": "开心分享", "hint": "明亮、惊喜", "text": "你猜我刚刚发现什么？楼下新开了一家很小的书店，里面居然有我一直想找的那本旧诗集！"},
+      "tease": {"label": "俏皮吐槽", "hint": "熟悉、狡黠", "text": "又熬夜写代码哦？黑眼圈都快比代码行数多了呢。快去睡，不然明天又要我提醒你三次才肯起床。"},
+      "comfort": {"label": "认真安慰", "hint": "沉静、可靠", "text": "今天辛苦了。不用急着说什么，就这样坐一会儿也好。我在这儿，慢慢来，不用一个人扛着。"},
+      "explain": {"label": "自然解释", "hint": "清楚、专注", "text": "这个函数的作用，是把输入的句子拆成更短的片段，再一段一段送进去合成，这样开口会更快。"},
+      "bedtime": {"label": "晚安陪伴", "hint": "软糯、亲密", "text": "哥哥听好啦～今晚就用我的声音陪你入睡。晚安啦，我最喜欢的哥哥，梦里也要梦到我哦。明天见，好梦～"},
+      "sad": {"label": "难过委屈", "hint": "低落、轻声、带点哽咽", "text": "嗯……我知道你最近很忙，可是我等了你一整个晚上。没关系的，我只是……有一点点难过而已。"},
+      "surprised": {"label": "惊讶意外", "hint": "意外、上扬、睁大眼睛的语气", "text": "诶？等一下，这个是你自己做的吗？怎么会这么好看！你什么时候偷偷学会的呀！"},
+      "angry": {"label": "嘟嘴生气", "hint": "气鼓鼓的可爱抱怨，全程生气不转折，不是真发火", "text": "哼！又熬到这么晚！说好的十二点就睡，你根本就没把我的话放在心上嘛！"},
+      "angry2": {"label": "嘟嘴生气", "hint": "气鼓鼓的可爱抱怨，全程生气不转折，不是真发火", "text": "你又偷吃我的布丁！那是我留到晚上才舍得吃的！哼，我生气了，今天都不跟你说话了！"},
+      "nervous": {"label": "紧张着急", "hint": "语速快、慌乱、有点结巴", "text": "等、等一下！电脑怎么突然这么烫，还一直在响，是不是要坏了？你快过来看看呀！"},
+      "shy2": {"label": "害羞脸红", "hint": "小声、慌乱、不好意思，嘴硬", "text": "诶？你、你突然夸我干嘛啦……我才没有脸红呢，是房间太热了而已。"},
+      "gentle": {"label": "温柔照顾", "hint": "轻柔、耐心、安心", "text": "累了吧？过来坐一会儿，我给你倒了杯热水。今天的事不用急着想，先好好休息。"},
+      "sleepy": {"label": "困倦迷糊", "hint": "困得睁不开眼、慢、含糊、打哈欠", "text": "唔……几点了呀……我好困，眼睛都睁不开了。你也早点睡嘛，晚安……"},
+      "confused": {"label": "困惑不解", "hint": "疑惑、歪头、语调上扬又犹豫", "text": "嗯？等一下，你刚才说的是哪个文件呀？我怎么没太听明白……是这个吗？"}
+    }
   }
 }

@@ -15,13 +15,6 @@
       "scene": "daily",
       "text": "嗯？你回来啦。今天好像有点晚呢……我刚刚还在想，你是不是又忙着写代码，忘记时间了。"
     },
-    "gentle": {
-      "label": "温柔",
-      "file": "gentle.wav",
-      "source": "models/zelia/qwen_v2/bedtime_t1.wav",
-      "scene": "bedtime",
-      "text": "哥哥听好啦～今晚就用我的声音陪你入睡。晚安啦，我最喜欢的哥哥，梦里也要梦到我哦。明天见，好梦～"
-    },
     "sad": {
       "label": "难过",
       "file": "sad.wav",
@@ -29,19 +22,19 @@
       "scene": "sad",
       "text": "嗯……我知道你最近很忙，可是我等了你一整个晚上。没关系的，我只是……有一点点难过而已。"
     },
+    "angry": {
+      "label": "生气",
+      "file": "angry.wav",
+      "source": "output/qwen3_voice_design/zihan_v2/20261022_angry/angry_t2.wav",
+      "scene": "angry",
+      "text": "哼！又熬到这么晚！说好的十二点就睡，你根本就没把我的话放在心上嘛！"
+    },
     "surprised": {
       "label": "惊讶",
       "file": "surprised.wav",
       "source": "output/qwen3_voice_design/zihan_v2/20261021_emotions/surprised_t2.wav",
       "scene": "surprised",
       "text": "诶？等一下，这个是你自己做的吗？怎么会这么好看！你什么时候偷偷学会的呀！"
-    },
-    "nervous": {
-      "label": "紧张",
-      "file": "nervous.wav",
-      "source": "output/qwen3_voice_design/zihan_v2/20261021_emotions/nervous_t1.wav",
-      "scene": "nervous",
-      "text": "等、等一下！电脑怎么突然这么烫，还一直在响，是不是要坏了？你快过来看看呀！"
     },
     "shy": {
       "label": "害羞",
@@ -57,19 +50,26 @@
       "scene": "sleepy",
       "text": "唔……几点了呀……我好困，眼睛都睁不开了。你也早点睡嘛，晚安……"
     },
+    "gentle": {
+      "label": "温柔",
+      "file": "gentle.wav",
+      "source": "models/zelia/qwen_v2/bedtime_t1.wav",
+      "scene": "bedtime",
+      "text": "哥哥听好啦～今晚就用我的声音陪你入睡。晚安啦，我最喜欢的哥哥，梦里也要梦到我哦。明天见，好梦～"
+    },
+    "nervous": {
+      "label": "紧张",
+      "file": "nervous.wav",
+      "source": "output/qwen3_voice_design/zihan_v2/20261021_emotions/nervous_t1.wav",
+      "scene": "nervous",
+      "text": "等、等一下！电脑怎么突然这么烫，还一直在响，是不是要坏了？你快过来看看呀！"
+    },
     "confused": {
       "label": "困惑",
       "file": "confused.wav",
       "source": "output/qwen3_voice_design/zihan_v2/20261021_round2/confused_t2.wav",
       "scene": "confused",
       "text": "嗯？等一下，你刚才说的是哪个文件呀？我怎么没太听明白……是这个吗？"
-    },
-    "angry": {
-      "label": "生气",
-      "file": "angry.wav",
-      "source": "output/qwen3_voice_design/zihan_v2/20261022_angry/angry_t2.wav",
-      "scene": "angry",
-      "text": "哼！又熬到这么晚！说好的十二点就睡，你根本就没把我的话放在心上嘛！"
     }
   }
 }

@@ -1,10 +1,11 @@
 """十种情绪参考的克隆确认（AiriLife M53-07，上线前最后一轮人耳验收）。
 
-读取 models/zelia/qwen_v2/emotions/emotions.json，每种情绪用自己的参考片（逐字 ref_text）
+读取 <角色>/qwen_vN/emotions/emotions.json（默认梓涵 models/zelia/qwen_v2/emotions），每种情绪用自己的参考片（逐字 ref_text）
 以 0.6B Base ICL 克隆两句新台词，生成参数与常驻服务一致、不加指令。只出试听页，不打分。
 
 用法（conda env qwen3-tts-fast，先停掉常驻服务腾显存）：
     python tools/qwen/emotion_clone_check.py
+    python tools/qwen/emotion_clone_check.py --emotion-dir models/airi/qwen_v1/emotions
 """
 
 from __future__ import annotations
@@ -47,9 +48,11 @@ def main() -> int:
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run-name", default=None)
+    ap.add_argument("--emotion-dir", default=str(EMOTION_DIR), help="含 emotions.json 的定稿目录")
     args = ap.parse_args()
+    emotion_dir = Path(args.emotion_dir).resolve()
 
-    emotions = json.loads((EMOTION_DIR / "emotions.json").read_text(encoding="utf-8"))["emotions"]
+    emotions = json.loads((emotion_dir / "emotions.json").read_text(encoding="utf-8"))["emotions"]
     run_dir = OUT_ROOT / (args.run_name or time.strftime("%Y%m%d_%H%M%S"))
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -60,7 +63,7 @@ def main() -> int:
 
     rows = []
     for key, ref in emotions.items():
-        ref_wav = EMOTION_DIR / ref["file"]
+        ref_wav = emotion_dir / ref["file"]
         cells = []
         for i, text in enumerate(TEXTS[key], 1):
             chunks, sr = [], 24000
@@ -74,7 +77,7 @@ def main() -> int:
             sf.write(str(run_dir / name), np.concatenate(chunks), sr)
             cells.append(f"<td><small>{html.escape(text)}</small><audio controls preload='none' src='{name}'></audio></td>")
             print(name, flush=True)
-        ref_src = f"../../../{(EMOTION_DIR / ref['file']).relative_to(ROOT).as_posix()}"
+        ref_src = f"../../../{(emotion_dir / ref['file']).relative_to(ROOT).as_posix()}"
         rows.append(
             f"<tr><td><b>{html.escape(ref['label'])}</b> <small>{key}</small>"
             f"<audio controls preload='none' src='{ref_src}'></audio></td>{''.join(cells)}</tr>"
